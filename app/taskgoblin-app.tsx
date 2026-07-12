@@ -5,9 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { LandingPage } from "@/app/_components/taskgoblin/landing-page";
 import { LoadingScreen } from "@/app/_components/taskgoblin/loading-screen";
-import { ProjectOverview } from "@/app/_components/taskgoblin/project-overview";
-import { TaskBoard } from "@/app/_components/taskgoblin/task-board";
 import { TaskSidebar } from "@/app/_components/taskgoblin/task-sidebar";
+import { TaskWorkspace } from "@/app/_components/taskgoblin/task-workspace";
 import {
   ImportHero,
   ImportStatus,
@@ -229,6 +228,16 @@ export default function TaskGoblinApp({
     }
   }
 
+  function toggleSubtask(taskId: string, subtaskId: string) {
+    const task = scan.tasks.find((item) => item.id === taskId);
+    if (!task?.subtasks) return;
+    updateTask(taskId, {
+      subtasks: task.subtasks.map((subtask) =>
+        subtask.id === subtaskId ? { ...subtask, completed: !subtask.completed } : subtask,
+      ),
+    });
+  }
+
   function addTeamMember(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -268,6 +277,36 @@ export default function TaskGoblinApp({
     } finally {
       setIsSendingReminder(false);
     }
+  }
+
+  async function configureAutoReminder(task: TaskItem, enabled: boolean, leadMinutes: number) {
+    updateTask(task.id, { autoReminder: enabled, reminderLeadMinutes: leadMinutes });
+    if (!enabled) {
+      setImportStatus(`Automatic reminders disabled for “${task.title}”.`);
+      return;
+    }
+
+    const dueAt = task.deadline ? Date.parse(task.deadline) : Number.NaN;
+    if (!Number.isFinite(dueAt)) {
+      setImportStatus(`Add an exact date and time to “${task.title}” before enabling its automatic reminder.`);
+      updateTask(task.id, { autoReminder: false, reminderLeadMinutes: leadMinutes });
+      return;
+    }
+
+    const scheduledFor = new Date(dueAt - leadMinutes * 60_000);
+    if (scheduledFor.getTime() <= Date.now()) {
+      setImportStatus("That reminder time has already passed. Choose a later due date or shorter lead time.");
+      updateTask(task.id, { autoReminder: false, reminderLeadMinutes: leadMinutes });
+      return;
+    }
+
+    const response = await fetch(`/api/tasks/${task.id}/reminders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task, tone, scheduledFor: scheduledFor.toISOString(), generateAtDelivery: true }),
+    });
+    const payload = (await response.json()) as { error?: string };
+    setImportStatus(response.ok ? `Automatic Telegram reminder queued for ${scheduledFor.toLocaleString()}.` : payload.error ?? "Could not queue the reminder.");
   }
 
   async function signInWithOAuth(provider: Provider) {
@@ -310,12 +349,12 @@ export default function TaskGoblinApp({
       <ImportStatus status={importStatus} scan={scan} />
 
       <section className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <ProjectOverview scan={scan} />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <TaskBoard
-            tasks={scan.tasks}
+          <TaskWorkspace
+            scan={scan}
             selectedTaskId={selectedTaskId}
             onMoveTask={(taskId, status) => updateTask(taskId, { status })}
+            onToggleSubtask={toggleSubtask}
             onSelectTask={(task) => {
               setSelectedTaskId(task.id);
               setReminderMessage("");
@@ -335,6 +374,7 @@ export default function TaskGoblinApp({
               setReminderMessage("");
             }}
             onScheduleReminder={(task) => void scheduleReminder(task)}
+            onAutoReminderChange={(task, enabled, leadMinutes) => void configureAutoReminder(task, enabled, leadMinutes)}
           />
         </div>
       </section>

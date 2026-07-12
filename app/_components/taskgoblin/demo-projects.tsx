@@ -59,7 +59,10 @@ export function DemoProjects() {
       <header className="border-b bg-[#07140e]/95">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
           <BrandMark dark />
-          <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-foreground">Back to home</Link>
+          <nav className="flex items-center gap-2">
+            <a href="/telegram.html" className="rounded-xl px-3 py-2 text-sm font-bold text-muted-foreground hover:bg-white/5 hover:text-foreground">Open demo chat</a>
+            <Link href="/" className="rounded-xl px-3 py-2 text-sm font-bold text-muted-foreground hover:bg-white/5 hover:text-foreground">Back to home</Link>
+          </nav>
         </div>
       </header>
       <section className="mx-auto max-w-7xl px-5 py-12 sm:px-8">

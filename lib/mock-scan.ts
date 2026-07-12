@@ -31,6 +31,11 @@ export function createMockScanResult(
       confidence: 0.86,
       sourceMessageIds: ids(source.slice(0, 2)),
       sourceSnippet: source[0]?.text,
+      subtasks: [
+        { id: "pitch-outline", title: "Write the seven-slide pitch narrative", completed: true },
+        { id: "pitch-demo", title: "Capture the Telegram-to-board demo flow", completed: false },
+        { id: "pitch-metrics", title: "Add validation metrics and next milestones", completed: false },
+      ],
     },
     {
       id: "task-landing-page",
@@ -43,6 +48,11 @@ export function createMockScanResult(
       confidence: 0.78,
       sourceMessageIds: ids(source.slice(2, 4)),
       sourceSnippet: source[2]?.text,
+      subtasks: [
+        { id: "landing-copy", title: "Rewrite the landing-page value proposition", completed: false },
+        { id: "landing-upload", title: "Test brief and Telegram upload states", completed: false },
+        { id: "landing-mobile", title: "Verify the demo flow at mobile width", completed: false },
+      ],
     },
     {
       id: "task-deployment",
@@ -55,6 +65,12 @@ export function createMockScanResult(
       confidence: 0.7,
       sourceMessageIds: ids(source.slice(4, 5)),
       sourceSnippet: source[4]?.text,
+      subtasks: [
+        { id: "deploy-env", title: "Configure production environment variables", completed: false },
+        { id: "deploy-db", title: "Apply the TaskGoblin database migration", completed: false },
+        { id: "deploy-vercel", title: "Deploy the Next.js application to Vercel", completed: false },
+        { id: "deploy-webhook", title: "Register the production Telegram webhook", completed: false },
+      ],
     },
     {
       id: "task-branding",
@@ -68,6 +84,10 @@ export function createMockScanResult(
       blockedBy: "Waiting on team approval",
       sourceMessageIds: ids(source.slice(5, 7)),
       sourceSnippet: source[5]?.text,
+      subtasks: [
+        { id: "brand-tokens", title: "Approve the forest and lime colour tokens", completed: false },
+        { id: "brand-type", title: "Confirm Geist typography across product screens", completed: false },
+      ],
     },
   ];
 
@@ -172,6 +192,11 @@ function createMockBriefScanResult(
       confidence: 0.62,
       sourceMessageIds: [section.id],
       sourceSnippet: section.text.slice(0, 180),
+      subtasks: [
+        { id: `brief-${index + 1}-review`, title: "Review the deliverable requirements and constraints", completed: false },
+        { id: `brief-${index + 1}-build`, title: "Create the first reviewable implementation", completed: false },
+        { id: `brief-${index + 1}-verify`, title: "Test the output against the assignment rubric", completed: false },
+      ],
     }));
 
   return {

@@ -398,6 +398,24 @@
       .export-wrap {
         position: relative;
       }
+      .open-app {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid #4e6a82;
+        border-radius: 10px;
+        background: #162a3b;
+        padding: 9px 12px;
+        color: #b9daf0;
+        font-size: 13px;
+        font-weight: 750;
+        text-decoration: none;
+        transition: 160ms ease;
+      }
+      .open-app:hover {
+        border-color: #65c4ff;
+        background: #203b50;
+        color: white;
+      }
       .export {
         display: flex;
         align-items: center;
@@ -493,6 +511,14 @@
         .export {
           padding: 9px;
         }
+        .open-app {
+          padding: 9px;
+          font-size: 0;
+        }
+        .open-app::after {
+          content: "TG";
+          font-size: 12px;
+        }
         .pinned {
           padding-inline: 12px;
         }
@@ -572,6 +598,7 @@
             >
           </div>
           <div class="header-actions">
+            <a class="open-app" href="/demo" title="Open TaskGoblin demo workspace">Open TaskGoblin</a>
             <button class="icon-button optional" aria-label="Search messages">
               <svg viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="7" />

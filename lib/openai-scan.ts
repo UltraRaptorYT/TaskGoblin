@@ -51,6 +51,7 @@ const TASK_SCAN_SCHEMA = {
             "confidence",
             "sourceMessageIds",
             "sourceSnippet",
+            "subtasks",
           ],
           properties: {
             id: { type: "string" },
@@ -72,6 +73,21 @@ const TASK_SCAN_SCHEMA = {
               items: { type: "number" },
             },
             sourceSnippet: { type: "string" },
+            subtasks: {
+              type: "array",
+              minItems: 2,
+              maxItems: 7,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["id", "title", "completed"],
+                properties: {
+                  id: { type: "string" },
+                  title: { type: "string" },
+                  completed: { type: "boolean" },
+                },
+              },
+            },
           },
         },
       },
@@ -190,7 +206,7 @@ async function scanImport(
       .join(", ") || "Not explicitly listed"}\n\nSource content:\n${transcript}`,
     config: {
       systemInstruction:
-        `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Goblin tone may be playful, but never cruel.`,
+        `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Break every deliverable into 2–7 concrete, independently completable subtasks. Each subtask must begin with a specific action verb and describe one observable output. Never return vague subtasks such as “Work on database” or “Handle Telegram”; prefer “Create SQL tables for users and tasks”, “Implement GET query for task rows”, and “Register the Telegram /start command”. Keep parent task titles outcome-focused and subtasks implementation-specific. Goblin tone may be playful, but never cruel.`,
       responseMimeType: "application/json",
       responseJsonSchema: TASK_SCAN_SCHEMA.schema,
     },

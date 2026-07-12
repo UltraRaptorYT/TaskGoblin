@@ -9,6 +9,7 @@ const ALLOWED_FIELDS = new Set([
   "source_participant_name",
   "due_label",
   "due_at",
+  "subtasks",
 ]);
 
 export async function PATCH(
@@ -28,8 +29,14 @@ export async function PATCH(
   }
 
   const body = (await request.json()) as Record<string, unknown>;
+  const aliases: Record<string, string> = {
+    owner: "source_participant_name",
+    deadline: "due_label",
+  };
   const patch = Object.fromEntries(
-    Object.entries(body).filter(([key]) => ALLOWED_FIELDS.has(key))
+    Object.entries(body)
+      .map(([key, value]) => [aliases[key] ?? key, value] as [string, unknown])
+      .filter(([key]) => ALLOWED_FIELDS.has(key))
   );
 
   if (Object.keys(patch).length === 0) {

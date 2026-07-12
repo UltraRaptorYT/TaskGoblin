@@ -10,6 +10,12 @@ export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export type AccountabilityTone = "professional" | "friendly" | "goblin";
 
+export type TaskSubtask = {
+  id: string;
+  title: string;
+  completed: boolean;
+};
+
 export type TaskItem = {
   id: string;
   title: string;
@@ -22,6 +28,9 @@ export type TaskItem = {
   blockedBy?: string;
   sourceMessageIds: number[];
   sourceSnippet?: string;
+  subtasks?: TaskSubtask[];
+  autoReminder?: boolean;
+  reminderLeadMinutes?: number;
 };
 
 export type Decision = {

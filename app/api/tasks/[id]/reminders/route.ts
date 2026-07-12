@@ -14,6 +14,7 @@ export async function POST(
     task?: TaskItem;
     tone?: AccountabilityTone;
     scheduledFor?: string;
+    generateAtDelivery?: boolean;
   };
   const tone = body.tone ?? "friendly";
   const task =
@@ -28,12 +29,14 @@ export async function POST(
       confidence: 0,
       sourceMessageIds: [],
     } satisfies TaskItem);
-  const message = await generateAccountabilityMessage(task, tone);
   const supabase = getSupabaseAdmin();
+  const scheduledAt = body.scheduledFor ? new Date(body.scheduledFor) : null;
+  const isFutureReminder = Boolean(body.generateAtDelivery && scheduledAt && scheduledAt.getTime() > Date.now());
+  const message = isFutureReminder ? "" : await generateAccountabilityMessage(task, tone);
   const chatId = process.env.TELEGRAM_DEFAULT_CHAT_ID;
-  const delivery: TelegramDelivery = chatId
+  const delivery: TelegramDelivery = !isFutureReminder && chatId
     ? await sendTelegramMessage(chatId, message)
-    : { sent: false, error: "Telegram reminder chat ID is not configured." };
+    : { sent: false, error: isFutureReminder ? undefined : "Telegram reminder chat ID is not configured." };
 
   if (!supabase) {
     return NextResponse.json({
@@ -43,6 +46,7 @@ export async function POST(
       persisted: false,
       delivered: delivery.sent,
       deliveryError: delivery.error,
+      scheduledFor: body.scheduledFor,
     });
   }
 

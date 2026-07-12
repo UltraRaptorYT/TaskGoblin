@@ -30,9 +30,10 @@ type TaskBoardProps = {
   selectedTaskId?: string;
   onSelectTask: (task: TaskItem) => void;
   onMoveTask: (taskId: string, status: TaskStatus) => void;
+  compact?: boolean;
 };
 
-export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: TaskBoardProps) {
+export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask, compact = false }: TaskBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string>();
   const [targetLane, setTargetLane] = useState<TaskStatus>();
   const touchDrag = useRef<{ taskId: string; pointerId: number } | undefined>(undefined);
@@ -67,8 +68,8 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
   }
 
   return (
-    <div className="min-w-0 rounded-3xl border border-border/80 bg-card/35 p-3 shadow-sm sm:p-4">
-      <div className="mb-4 flex items-end justify-between gap-4 px-1">
+    <div className={compact ? "min-w-0" : "min-w-0 rounded-3xl border border-border/80 bg-card/35 p-3 shadow-sm sm:p-4"}>
+      {!compact ? <div className="mb-4 flex items-end justify-between gap-4 px-1">
         <div className="flex items-start gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
             <KanbanSquare className="size-4" />
@@ -81,8 +82,8 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
         <span className="hidden rounded-full border bg-background/70 px-3 py-1.5 text-xs font-bold text-muted-foreground sm:block">
           {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
         </span>
-      </div>
-      <div className="grid snap-x snap-mandatory grid-flow-col auto-cols-[minmax(220px,1fr)] gap-3 overflow-x-auto pb-2 [scrollbar-color:var(--border)_transparent]">
+      </div> : null}
+      <div className="grid snap-x snap-mandatory grid-flow-col auto-cols-[minmax(205px,1fr)] gap-2 overflow-x-auto pb-2 [scrollbar-color:var(--border)_transparent]">
         {TASK_LANES.map((lane) => {
           const laneTasks = tasks.filter((task) => task.status === lane.id);
           const isTarget = targetLane === lane.id;
@@ -90,7 +91,7 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
             <section
               key={lane.id}
               data-task-lane={lane.id}
-              className={`relative min-h-[360px] snap-start overflow-hidden rounded-2xl border bg-muted/55 p-3 pt-4 transition ${isTarget ? "border-accent ring-2 ring-accent/60" : "border-border/80"}`}
+              className={`relative min-h-[340px] snap-start overflow-hidden rounded-xl border bg-muted/55 p-2.5 pt-4 transition ${isTarget ? "border-accent ring-2 ring-accent/60" : "border-border/80"}`}
               onDragOver={(event) => { event.preventDefault(); setTargetLane(lane.id); }}
               onDrop={(event) => {
                 event.preventDefault();
@@ -112,7 +113,7 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
                     draggable
                     role="button"
                     tabIndex={0}
-                    className={`w-full cursor-pointer rounded-xl border bg-card p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-ring hover:shadow-md ${draggedTaskId === task.id ? "opacity-45" : ""} ${selectedTaskId === task.id ? "border-ring ring-2 ring-accent" : "border-border"}`}
+                    className={`w-full cursor-pointer rounded-lg border bg-card p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-ring hover:shadow-md ${draggedTaskId === task.id ? "opacity-45" : ""} ${selectedTaskId === task.id ? "border-ring ring-2 ring-accent" : "border-border"}`}
                     onClick={() => onSelectTask(task)}
                     onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectTask(task); }}
                     onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/task-id", task.id); setDraggedTaskId(task.id); }}

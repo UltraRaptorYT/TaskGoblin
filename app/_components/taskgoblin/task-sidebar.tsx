@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Send, UserPlus, Users, X } from "lucide-react";
+import { BellRing, Loader2, Send, UserPlus, Users, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
@@ -23,9 +23,10 @@ type TaskSidebarProps = {
   onRemoveTeamMember: (name: string) => void;
   onToneChange: (tone: AccountabilityTone) => void;
   onScheduleReminder: (task: TaskItem) => void;
+  onAutoReminderChange: (task: TaskItem, enabled: boolean, leadMinutes: number) => void;
 };
 
-export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, isSendingReminder, onUpdateTask, onAddTeamMember, onRemoveTeamMember, onToneChange, onScheduleReminder }: TaskSidebarProps) {
+export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, isSendingReminder, onUpdateTask, onAddTeamMember, onRemoveTeamMember, onToneChange, onScheduleReminder, onAutoReminderChange }: TaskSidebarProps) {
   const [newMember, setNewMember] = useState("");
   const ownerOptions = [
     ...new Set([
@@ -96,6 +97,15 @@ export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, 
               Due date or label
               <input className="mt-1.5 h-10 w-full rounded-xl border bg-background px-3 text-sm font-normal text-foreground outline-none focus:ring-2 focus:ring-ring" value={selectedTask.deadline ?? ""} placeholder="e.g. Friday 5 PM" onChange={(event) => onUpdateTask(selectedTask.id, { deadline: event.target.value || null })} />
             </label>
+            <div className="rounded-xl border bg-muted/55 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="flex items-center gap-1.5 text-xs font-black"><BellRing className="size-3.5 text-primary" /> Automatic reminder</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">Queue a Telegram nudge before the due date.</p></div>
+                <button type="button" role="switch" aria-checked={Boolean(selectedTask.autoReminder)} className={`relative h-6 w-11 rounded-full transition ${selectedTask.autoReminder ? "bg-primary" : "bg-border"}`} onClick={() => onAutoReminderChange(selectedTask, !selectedTask.autoReminder, selectedTask.reminderLeadMinutes ?? 1440)}><span className={`absolute top-1 size-4 rounded-full bg-white transition ${selectedTask.autoReminder ? "left-6" : "left-1"}`} /></button>
+              </div>
+              <select className="mt-3 h-9 w-full rounded-lg border bg-background px-2 text-xs" value={selectedTask.reminderLeadMinutes ?? 1440} onChange={(event) => onAutoReminderChange(selectedTask, true, Number(event.target.value))}>
+                <option value={60}>1 hour before</option><option value={360}>6 hours before</option><option value={1440}>1 day before</option><option value={2880}>2 days before</option>
+              </select>
+            </div>
             {selectedTask.sourceSnippet ? (
               <details className="rounded-xl bg-muted p-3">
                 <summary className="cursor-pointer text-xs font-bold text-muted-foreground">View source context</summary>
@@ -126,7 +136,7 @@ export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, 
             {isSendingReminder ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
             {isSendingReminder ? "Generating and sending..." : "Generate & send reminder"}
           </Button>
-          <p className="text-[11px] leading-4 text-[#9fb1a3]">Sent to the personal chat configured in TELEGRAM_DEFAULT_CHAT_ID. Undelivered reminders remain saved for later.</p>
+          <p className="text-[11px] leading-4 text-[#9fb1a3]">Send now creates a fresh AI message. Automatic reminders are queued against the task due date.</p>
         </CardContent>
       </Card>
     </aside>

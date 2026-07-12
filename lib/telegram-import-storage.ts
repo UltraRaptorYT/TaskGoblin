@@ -95,6 +95,7 @@ export async function persistTelegramImport(params: {
         blocked_by: task.blockedBy,
         source_message_ids: task.sourceMessageIds,
         source_snippet: task.sourceSnippet,
+        subtasks: task.subtasks ?? [],
       }))
     );
   }
