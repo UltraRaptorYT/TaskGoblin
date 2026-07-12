@@ -34,7 +34,7 @@ export async function POST(
   }
 
   const { data: telegramImport, error } = await supabase
-    .from("telegram_imports")
+    .from("taskgoblin_telegram_imports")
     .select("id, project_id, chat_name, message_count")
     .eq("id", id)
     .single();

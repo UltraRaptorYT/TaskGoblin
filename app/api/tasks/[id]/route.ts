@@ -40,7 +40,7 @@ export async function PATCH(
   }
 
   const { data, error } = await supabase
-    .from("tasks")
+    .from("taskgoblin_tasks")
     .update(patch)
     .eq("id", id)
     .select()

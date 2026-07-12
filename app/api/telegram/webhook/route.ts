@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const { error } = await supabase.from("notification_deliveries").insert({
+  const { error } = await supabase.from("taskgoblin_notification_deliveries").insert({
     channel: "telegram",
     status: "received",
     provider_payload: update,

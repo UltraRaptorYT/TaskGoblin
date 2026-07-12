@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TaskGoblin — Pitch Deck</title>
+    <meta
+      name="description"
+      content="TaskGoblin turns group-chat chaos into clear tasks, owners, deadlines, and timely nudges."
+    />
+    <style>
+      :root {
+        --ink: #173d2b;
+        --lime: #dfff64;
+        --paper: #f4f1e8;
+        --cream: #fffdf7;
+        --muted: #657168;
+        --line: #d6d2c5;
+        --amber: #ffbd59;
+        --red: #ff725e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #0e251a;
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      body {
+        overflow: hidden;
+      }
+      button {
+        font: inherit;
+      }
+      .deck {
+        height: 100dvh;
+        position: relative;
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        align-content: center;
+        padding: clamp(28px, 5vw, 80px);
+        background: var(--paper);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateX(30px);
+        transition: 0.35s ease;
+        overflow: auto;
+      }
+      .slide.active {
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+      }
+      .slide.dark {
+        background: var(--ink);
+        color: white;
+      }
+      .slide.lime {
+        background: var(--lime);
+      }
+      .grain {
+        background-image: radial-gradient(
+          circle at 1px 1px,
+          rgba(23, 61, 43, 0.08) 1px,
+          transparent 0
+        );
+        background-size: 22px 22px;
+      }
+      .wrap {
+        width: min(1180px, 100%);
+        margin: auto;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 24px;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+      .eyebrow:before {
+        content: "";
+        width: 28px;
+        height: 4px;
+        background: var(--lime);
+        border-radius: 9px;
+      }
+      .lime .eyebrow:before {
+        background: var(--ink);
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(52px, 8vw, 112px);
+        line-height: 0.88;
+        letter-spacing: -0.065em;
+        font-weight: 950;
+      }
+      h2 {
+        max-width: 980px;
+        font-size: clamp(38px, 5.5vw, 76px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+      }
+      h3 {
+        font-size: clamp(20px, 2vw, 30px);
+        letter-spacing: -0.025em;
+      }
+      .lead {
+        max-width: 780px;
+        margin-top: 28px;
+        font-size: clamp(18px, 2vw, 28px);
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .dark .lead {
+        color: #c8d6cc;
+      }
+      .accent {
+        color: #77982f;
+      }
+      .dark .accent {
+        color: var(--lime);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        position: absolute;
+        left: clamp(28px, 5vw, 80px);
+        top: clamp(24px, 4vw, 48px);
+        font-size: 22px;
+        font-weight: 950;
+        letter-spacing: -0.04em;
+      }
+      .brand img {
+        width: 44px;
+        height: 44px;
+        object-fit: contain;
+        background: var(--lime);
+        border: 2px solid currentColor;
+        border-radius: 12px;
+        box-shadow: 3px 3px 0 currentColor;
+      }
+      .brand span span {
+        color: #75942f;
+      }
+      .dark .brand span span {
+        color: var(--lime);
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1fr minmax(240px, 390px);
+        align-items: center;
+        gap: 8vw;
+      }
+      .hero-mark {
+        width: 100%;
+        filter: drop-shadow(14px 14px 0 rgba(223, 255, 100, 0.16));
+      }
+      .tag {
+        display: inline-block;
+        margin-top: 28px;
+        padding: 10px 15px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin-top: 38px;
+      }
+      .card {
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--cream);
+        box-shadow: 0 3px 0 rgba(23, 61, 43, 0.12);
+      }
+      .dark .card {
+        border-color: #41604c;
+        background: #214b36;
+        color: white;
+      }
+      .num {
+        display: block;
+        margin-bottom: 20px;
+        color: #78972f;
+        font-size: 48px;
+        font-weight: 950;
+        letter-spacing: -0.06em;
+      }
+      .dark .num {
+        color: var(--lime);
+      }
+      .card p {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.5;
+      }
+      .dark .card p {
+        color: #c1cec4;
+      }
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-top: 42px;
+      }
+      .step {
+        position: relative;
+        padding: 26px 20px;
+        border: 2px solid var(--ink);
+        border-radius: 18px;
+        background: var(--cream);
+        box-shadow: 4px 4px 0 var(--ink);
+      }
+      .step b {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        margin-bottom: 22px;
+        border-radius: 50%;
+        background: var(--lime);
+      }
+      .step:not(:last-child):after {
+        content: "→";
+        position: absolute;
+        right: -19px;
+        top: 50%;
+        z-index: 2;
+        font-size: 24px;
+        font-weight: 900;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7vw;
+        align-items: center;
+      }
+      .quote {
+        font-size: clamp(28px, 4vw, 58px);
+        font-weight: 900;
+        line-height: 1.08;
+        letter-spacing: -0.045em;
+      }
+      .mock {
+        padding: 24px;
+        border: 2px solid var(--ink);
+        border-radius: 24px;
+        background: var(--cream);
+        box-shadow: 8px 8px 0 var(--lime);
+      }
+      .task {
+        margin-top: 12px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: white;
+      }
+      .pill {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 99px;
+        background: #fff0d7;
+        color: #8a5310;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+      .owner {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .compare {
+        width: 100%;
+        margin-top: 34px;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--cream);
+        font-size: clamp(13px, 1.5vw, 18px);
+      }
+      .compare th,
+      .compare td {
+        padding: 18px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+      }
+      .compare th {
+        background: #ebe7da;
+      }
+      .compare tr:last-child td {
+        border: 0;
+      }
+      .yes {
+        font-weight: 900;
+        color: #557720;
+      }
+      .metric-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px;
+        margin-top: 40px;
+      }
+      .metric {
+        padding: 28px;
+        border-left: 5px solid var(--lime);
+      }
+      .metric strong {
+        display: block;
+        font-size: clamp(42px, 6vw, 82px);
+        letter-spacing: -0.065em;
+      }
+      .metric span {
+        display: block;
+        margin-top: 8px;
+        color: #c8d6cc;
+        font-size: 17px;
+      }
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 48px;
+      }
+      .phase {
+        padding: 28px;
+        border-top: 5px solid var(--ink);
+      }
+      .phase:nth-child(2) {
+        border-color: #7b9c32;
+      }
+      .phase:nth-child(3) {
+        border-color: var(--lime);
+        background: rgba(255, 255, 255, 0.3);
+      }
+      .phase small {
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .phase ul {
+        padding-left: 20px;
+        line-height: 1.8;
+      }
+      .ask {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 35px;
+      }
+      .ask span {
+        padding: 12px 16px;
+        border: 1px solid #91ad54;
+        border-radius: 99px;
+        background: rgba(223, 255, 100, 0.1);
+        font-weight: 800;
+      }
+      .placeholder {
+        color: var(--lime);
+        text-decoration: underline;
+        text-decoration-style: dashed;
+        text-underline-offset: 6px;
+      }
+      .controls {
+        position: fixed;
+        z-index: 20;
+        right: 22px;
+        bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 14px;
+        background: rgba(14, 37, 26, 0.88);
+        color: white;
+        backdrop-filter: blur(10px);
+      }
+      .controls button {
+        width: 38px;
+        height: 38px;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: white;
+        cursor: pointer;
+        font-size: 20px;
+      }
+      .controls button:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .counter {
+        min-width: 52px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .progress {
+        position: fixed;
+        z-index: 21;
+        left: 0;
+        bottom: 0;
+        height: 5px;
+        background: var(--lime);
+        transition: 0.3s;
+      }
+      .hint {
+        position: fixed;
+        z-index: 20;
+        left: 22px;
+        bottom: 22px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      @media (max-width: 760px) {
+        .slide {
+          align-content: start;
+          padding-top: 105px;
+        }
+        .hero,
+        .split {
+          grid-template-columns: 1fr;
+        }
+        .hero-mark {
+          display: none;
+        }
+        .grid,
+        .metric-row,
+        .timeline {
+          grid-template-columns: 1fr;
+        }
+        .flow {
+          grid-template-columns: 1fr 1fr;
+        }
+        .step:after {
+          display: none;
+        }
+        .card {
+          padding: 20px;
+        }
+        .hint {
+          display: none;
+        }
+        .brand {
+          top: 24px;
+        }
+        .compare th,
+        .compare td {
+          padding: 10px;
+        }
+        .slide {
+          font-size: 14px;
+        }
+      }
+      @media print {
+        body {
+          overflow: visible;
+        }
+        .deck {
+          height: auto;
+        }
+        .slide {
+          position: relative;
+          display: grid;
+          visibility: visible;
+          opacity: 1;
+          transform: none;
+          width: 100vw;
+          height: 56.25vw;
+          min-height: 720px;
+          break-after: page;
+        }
+        .controls,
+        .progress,
+        .hint {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck" aria-label="TaskGoblin pitch deck">
+      <section class="slide dark active" data-title="Opening">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap hero">
+          <div>
+            <div class="eyebrow">The task layer for group chats</div>
+            <h1>
+              Less chat chaos.<br /><span class="accent"
+                >More quests done.</span
+              >
+            </h1>
+            <p class="lead">
+              TaskGoblin turns messy conversations into clear tasks, owners,
+              deadlines, and timely nudges.
+            </p>
+            <span class="tag">Telegram first · Team ready</span>
+          </div>
+          <img
+            class="hero-mark"
+            src="./brand/taskgoblin-logo.png"
+            alt="TaskGoblin mascot"
+          />
+        </div>
+      </section>
+
+      <section class="slide grain" data-title="Problem">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">The problem</div>
+          <h2>
+            Work gets assigned in chat.<br /><span class="accent"
+              >Then it disappears.</span
+            >
+          </h2>
+          <div class="grid">
+            <article class="card">
+              <span class="num">01</span>
+              <h3>Tasks are implicit</h3>
+              <p>
+                “Can someone handle this?” is buried between hundreds of
+                messages.
+              </p>
+            </article>
+            <article class="card">
+              <span class="num">02</span>
+              <h3>Ownership is fuzzy</h3>
+              <p>Everyone saw it. Nobody knows who actually owns it.</p>
+            </article>
+            <article class="card">
+              <span class="num">03</span>
+              <h3>Following up is awkward</h3>
+              <p>
+                Leads spend their time manually chasing updates and deadlines.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide lime" data-title="Insight">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap split">
+          <div>
+            <div class="eyebrow">Our insight</div>
+            <p class="quote">
+              Teams do not need another place to talk. They need a reliable
+              layer that turns talk into action.
+            </p>
+          </div>
+          <div class="mock">
+            <div class="pill">Goblin spotted a quest</div>
+            <h3 style="margin-top: 14px">Ship the launch deck</h3>
+            <p style="margin-top: 8px; color: var(--muted); line-height: 1.5">
+              Extracted from 47 messages, with context intact.
+            </p>
+            <div class="owner"><span>Owner: Joash</span><b>Due Friday</b></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide grain" data-title="Solution">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">The solution</div>
+          <h2>From chaotic chat to accountable work in four moves.</h2>
+          <div class="flow">
+            <div class="step">
+              <b>1</b>
+              <h3>Import</h3>
+              <p>Drop in a Telegram export.</p>
+            </div>
+            <div class="step">
+              <b>2</b>
+              <h3>Extract</h3>
+              <p>AI finds tasks, owners, risks, and deadlines.</p>
+            </div>
+            <div class="step">
+              <b>3</b>
+              <h3>Confirm</h3>
+              <p>The team reviews a clear shared board.</p>
+            </div>
+            <div class="step">
+              <b>4</b>
+              <h3>Nudge</h3>
+              <p>Reminders return to the chat where work began.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide dark" data-title="Product">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">The product</div>
+          <h2>Accountability without the enterprise overhead.</h2>
+          <div class="grid">
+            <article class="card">
+              <span class="num">✦</span>
+              <h3>Goblin Scan</h3>
+              <p>
+                Summarizes project health and surfaces ghost tasks, blockers,
+                and unanswered questions.
+              </p>
+            </article>
+            <article class="card">
+              <span class="num">✓</span>
+              <h3>Living task board</h3>
+              <p>
+                Every card keeps its source context, confidence, owner,
+                priority, and deadline.
+              </p>
+            </article>
+            <article class="card">
+              <span class="num">↗</span>
+              <h3>Smart nudges</h3>
+              <p>
+                Professional, friendly, or goblin-mode reminders staged for
+                Telegram.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide grain" data-title="Differentiation">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">Why TaskGoblin</div>
+          <h2>Built for where lightweight teams already work.</h2>
+          <table class="compare">
+            <thead>
+              <tr>
+                <th></th>
+                <th>TaskGoblin</th>
+                <th>Project tools</th>
+                <th>Chat bots</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Understands conversation context</td>
+                <td class="yes">Yes</td>
+                <td>Manual entry</td>
+                <td>Limited</td>
+              </tr>
+              <tr>
+                <td>Creates accountable task board</td>
+                <td class="yes">Yes</td>
+                <td>Yes</td>
+                <td>Rarely</td>
+              </tr>
+              <tr>
+                <td>Nudges inside the original chat</td>
+                <td class="yes">Yes</td>
+                <td>External alerts</td>
+                <td>Yes</td>
+              </tr>
+              <tr>
+                <td>Setup for small teams</td>
+                <td class="yes">Minutes</td>
+                <td>Hours or days</td>
+                <td>Minutes</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="slide dark" data-title="Opportunity">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">The opportunity</div>
+          <h2>
+            Start with chat-native teams.<br />Expand into the action layer for
+            every conversation.
+          </h2>
+          <div class="metric-row">
+            <div class="metric">
+              <strong>1st</strong
+              ><span
+                >Telegram communities, student teams, agencies, and startup
+                crews.</span
+              >
+            </div>
+            <div class="metric">
+              <strong>2nd</strong
+              ><span
+                >WhatsApp, Discord, Slack, and Microsoft Teams
+                integrations.</span
+              >
+            </div>
+            <div class="metric">
+              <strong>∞</strong
+              ><span
+                >Every messy conversation that should have become accountable
+                work.</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide grain" data-title="Business">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">Business model</div>
+          <h2>Simple SaaS pricing that grows with the crew.</h2>
+          <div class="grid">
+            <article class="card">
+              <span class="num">$0</span>
+              <h3>Scout</h3>
+              <p>One active project, limited scans, core board experience.</p>
+            </article>
+            <article
+              class="card"
+              style="
+                border: 3px solid var(--ink);
+                box-shadow: 7px 7px 0 var(--lime);
+              "
+            >
+              <span class="num">$12</span>
+              <h3>Crew / month</h3>
+              <p>
+                Unlimited projects, scheduled nudges, history, and integrations.
+              </p>
+            </article>
+            <article class="card">
+              <span class="num">$$</span>
+              <h3>Guild</h3>
+              <p>
+                Admin controls, advanced analytics, custom retention, and
+                support.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide lime" data-title="Roadmap">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">Go-to-market & roadmap</div>
+          <h2>Win one focused workflow, then widen the den.</h2>
+          <div class="timeline">
+            <div class="phase">
+              <small>Now · Prove</small>
+              <h3>MVP + design partners</h3>
+              <ul>
+                <li>Telegram import and scan</li>
+                <li>Task board and nudges</li>
+                <li>10–20 active teams</li>
+              </ul>
+            </div>
+            <div class="phase">
+              <small>Next · Retain</small>
+              <h3>Daily team habit</h3>
+              <ul>
+                <li>Live bot ingestion</li>
+                <li>Recurring reminders</li>
+                <li>Project history and analytics</li>
+              </ul>
+            </div>
+            <div class="phase">
+              <small>Then · Expand</small>
+              <h3>Multi-chat action layer</h3>
+              <ul>
+                <li>WhatsApp and Discord</li>
+                <li>Calendar and Jira sync</li>
+                <li>Team and enterprise plans</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide dark" data-title="Ask">
+        <div class="brand">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >Task<span>Goblin</span></span
+          >
+        </div>
+        <div class="wrap">
+          <div class="eyebrow">The ask</div>
+          <h2>
+            Help us make forgotten tasks
+            <span class="accent">a thing of the past.</span>
+          </h2>
+          <p class="lead">
+            We are looking for
+            <span class="placeholder"
+              >[design partners / pilot teams / funding amount]</span
+            >
+            to validate retention, sharpen the live Telegram workflow, and
+            launch the first paid plan.
+          </p>
+          <div class="ask">
+            <span>20 pilot teams</span><span>Product feedback</span
+            ><span>Introductions to chat-native communities</span>
+          </div>
+          <p style="margin-top: 44px; font-size: 18px; font-weight: 850">
+            Your Name · your@email.com · taskgoblin.app
+          </p>
+        </div>
+      </section>
+    </main>
+    <div class="hint">← → navigate · F fullscreen · P print</div>
+    <div class="controls">
+      <button id="prev" aria-label="Previous slide">←</button
+      ><span class="counter" id="counter">1 / 10</span
+      ><button id="next" aria-label="Next slide">→</button>
+    </div>
+    <div class="progress" id="progress"></div>
+    <script>
+      const slides = [...document.querySelectorAll(".slide")],
+        counter = document.querySelector("#counter"),
+        progress = document.querySelector("#progress");
+      let index = 0;
+      function show(n) {
+        index = (n + slides.length) % slides.length;
+        slides.forEach((s, i) => s.classList.toggle("active", i === index));
+        counter.textContent = `${index + 1} / ${slides.length}`;
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+        document.title = `${slides[index].dataset.title} — TaskGoblin Pitch`;
+        history.replaceState(null, "", `#${index + 1}`);
+      }
+      document.querySelector("#next").onclick = () => show(index + 1);
+      document.querySelector("#prev").onclick = () => show(index - 1);
+      document.addEventListener("keydown", (e) => {
+        if (["ArrowRight", " ", "PageDown"].includes(e.key)) show(index + 1);
+        if (["ArrowLeft", "PageUp"].includes(e.key)) show(index - 1);
+        if (e.key.toLowerCase() === "f")
+          document.documentElement.requestFullscreen?.();
+        if (e.key.toLowerCase() === "p") window.print();
+      });
+      let start = 0;
+      document.addEventListener(
+        "touchstart",
+        (e) => (start = e.changedTouches[0].screenX),
+        { passive: true },
+      );
+      document.addEventListener(
+        "touchend",
+        (e) => {
+          const d = e.changedTouches[0].screenX - start;
+          if (Math.abs(d) > 50) show(index + (d < 0 ? 1 : -1));
+        },
+        { passive: true },
+      );
+      const initial = Number(location.hash.slice(1)) - 1;
+      if (Number.isInteger(initial) && initial >= 0 && initial < slides.length)
+        index = initial;
+      show(index);
+    </script>
+  </body>
+</html>

@@ -18,12 +18,12 @@ export async function persistTelegramImport(params: {
   const importId = crypto.randomUUID();
   const scanRunId = crypto.randomUUID();
 
-  await supabase.from("workspaces").insert({
+  await supabase.from("taskgoblin_workspaces").insert({
     id: workspaceId,
     name: telegramImport.chatName,
   });
 
-  await supabase.from("projects").insert({
+  await supabase.from("taskgoblin_projects").insert({
     id: projectId,
     workspace_id: workspaceId,
     name: telegramImport.chatName,
@@ -32,7 +32,7 @@ export async function persistTelegramImport(params: {
     health_label: scan.projectHealth.label,
   });
 
-  await supabase.from("telegram_imports").insert({
+  await supabase.from("taskgoblin_telegram_imports").insert({
     id: importId,
     project_id: projectId,
     chat_id: telegramImport.chatId,
@@ -45,7 +45,7 @@ export async function persistTelegramImport(params: {
   });
 
   if (telegramImport.participants.length > 0) {
-    await supabase.from("chat_participants").insert(
+    await supabase.from("taskgoblin_chat_participants").insert(
       telegramImport.participants.map((participant) => ({
         project_id: projectId,
         display_name: participant.name,
@@ -55,7 +55,7 @@ export async function persistTelegramImport(params: {
   }
 
   if (telegramImport.messages.length > 0) {
-    await supabase.from("telegram_messages").insert(
+    await supabase.from("taskgoblin_telegram_messages").insert(
       telegramImport.messages.map((message) => ({
         import_id: importId,
         telegram_message_id: message.id,
@@ -69,7 +69,7 @@ export async function persistTelegramImport(params: {
     );
   }
 
-  await supabase.from("scan_runs").insert({
+  await supabase.from("taskgoblin_scan_runs").insert({
     id: scanRunId,
     project_id: projectId,
     telegram_import_id: importId,
@@ -80,7 +80,7 @@ export async function persistTelegramImport(params: {
   });
 
   if (scan.tasks.length > 0) {
-    await supabase.from("tasks").insert(
+    await supabase.from("taskgoblin_tasks").insert(
       scan.tasks.map((task) => ({
         id: task.id,
         project_id: projectId,
@@ -99,7 +99,7 @@ export async function persistTelegramImport(params: {
     );
   }
 
-  await supabase.from("project_events").insert({
+  await supabase.from("taskgoblin_project_events").insert({
     project_id: projectId,
     event_type: "telegram_import_scanned",
     title: "Telegram import scanned",

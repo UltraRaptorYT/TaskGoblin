@@ -2,19 +2,21 @@
 
 import {
   AlertTriangle,
-  Bot,
   CalendarClock,
   CheckCircle2,
   FileJson,
   History,
   Loader2,
   MessageSquareText,
+  Menu,
   Send,
+  Sparkles,
   Upload,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -181,34 +183,46 @@ export default function TaskGoblinApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f2] text-stone-950">
-      <section className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-medium text-emerald-700">
-                <Bot className="size-4" />
-                Telegram-first accountability workspace
-              </div>
-              <h1 className="text-3xl font-semibold tracking-normal text-stone-950 sm:text-4xl">
-                TaskGoblin turns Telegram chaos into a board your team can
-                actually finish.
-              </h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-                Upload a Telegram Desktop export, extract tasks with OpenAI,
-                review a light Jira board, assign owners, and stage reminders
-                for the people who need a nudge.
-              </p>
-            </div>
+    <main className="min-h-screen text-[#17231c]">
+      <header className="border-b border-[#cad0b0] bg-[#f4f1e8]/95 backdrop-blur">
+        <div className="mx-auto flex h-18 max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <BrandMark />
+          <nav className="hidden items-center gap-7 text-sm font-semibold text-[#516057] md:flex" aria-label="Primary navigation">
+            <a className="text-[#173d2b]" href="#board">Board</a>
+            <a className="transition hover:text-[#173d2b]" href="#goblin-scan">Goblin scan</a>
+            <a className="transition hover:text-[#173d2b]" href="#reminders">Reminders</a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <span className="hidden rounded-full border border-[#b8c789] bg-[#eff6cf] px-3 py-1.5 text-xs font-bold text-[#38532f] sm:inline-flex">● Demo den</span>
+            <Button className="hidden sm:inline-flex" type="button">Invite your crew</Button>
+            <button className="grid size-10 place-items-center rounded-xl border border-[#c9c5b9] md:hidden" aria-label="Open menu"><Menu className="size-5" /></button>
+          </div>
+        </div>
+      </header>
 
-            <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-emerald-500 bg-emerald-50 px-4 py-5 text-center text-sm font-medium text-emerald-900 transition hover:bg-emerald-100 lg:w-80">
+      <section className="overflow-hidden border-b border-[#cad0b0] bg-[#173d2b] text-white">
+        <div className="relative mx-auto grid max-w-[1440px] gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1fr_390px] lg:items-center lg:px-8">
+          <div className="pointer-events-none absolute -right-24 -top-40 size-96 rounded-full border-[70px] border-[#dfff64]/10" />
+          <div className="relative max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#dfff64]/40 bg-[#dfff64]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-[#dfff64]">
+              <Sparkles className="size-3.5" /> Your tiny task wrangler
+            </div>
+            <h1 className="max-w-3xl text-4xl font-black leading-[0.98] tracking-[-0.045em] sm:text-6xl">
+              Less chat chaos.<br /><span className="text-[#dfff64]">More quests done.</span>
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#dce6dd] sm:text-lg">
+              Drop in a Telegram export. Your Goblin spots the work, finds the owners, and keeps the crew moving—without another meeting.
+            </p>
+          </div>
+
+          <label className="goblin-shadow relative flex w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-[#dfff64] bg-[#f9f7ef] px-6 py-8 text-center text-sm font-bold text-[#173d2b] transition hover:-translate-y-1 hover:bg-white">
               {isImporting ? (
-                <Loader2 className="size-5 animate-spin" />
+                <Loader2 className="size-7 animate-spin" />
               ) : (
-                <Upload className="size-5" />
+                <span className="grid size-12 place-items-center rounded-full bg-[#dfff64]"><Upload className="size-5" /></span>
               )}
-              <span>{isImporting ? "Scanning..." : "Upload result.json or ZIP"}</span>
-              <span className="max-w-full truncate text-xs font-normal text-emerald-700">
+              <span className="text-base">{isImporting ? "Goblin is rummaging..." : "Feed the Goblin a chat export"}</span>
+              <span className="max-w-full truncate text-xs font-medium text-[#69736b]">
                 {fileName}
               </span>
               <input
@@ -219,10 +233,12 @@ export default function TaskGoblinApp() {
                   void handleFileUpload(event.target.files?.[0] ?? null)
                 }
               />
-            </label>
-          </div>
+          </label>
+        </div>
+      </section>
 
-          <div className="grid gap-3 text-sm md:grid-cols-3">
+      <section className="border-b border-[#d8d3c5] bg-[#ebe7da]">
+        <div className="mx-auto grid max-w-[1440px] gap-3 px-4 py-4 text-sm sm:px-6 md:grid-cols-3 lg:px-8">
             <StatusPill
               icon={<FileJson className="size-4" />}
               label="Import"
@@ -238,17 +254,16 @@ export default function TaskGoblinApp() {
               label="Pitch"
               value="Jira for group chats, with reminders where the conversation started."
             />
-          </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-4 py-5 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
+      <section id="board" className="mx-auto grid max-w-[1440px] gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_370px] lg:px-8 lg:py-8">
         <div className="space-y-4">
-          <Card className="rounded-lg bg-white">
+          <Card id="goblin-scan" className="bg-[#fffdf7]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="size-5 text-emerald-700" />
-                Goblin Scan
+                <span className="grid size-8 place-items-center rounded-lg bg-[#dfff64]"><CheckCircle2 className="size-4 text-[#173d2b]" /></span>
+                The Goblin&apos;s read
               </CardTitle>
               <CardDescription>{scan.summary}</CardDescription>
             </CardHeader>
@@ -278,17 +293,17 @@ export default function TaskGoblinApp() {
                 return (
                   <div
                     key={lane.id}
-                    className="rounded-lg border border-stone-200 bg-white p-3"
+                    className="rounded-2xl border border-[#d8d3c5] bg-[#ebe7da]/70 p-3"
                   >
                     <div className="mb-3">
-                      <h2 className="text-sm font-semibold">{lane.title}</h2>
+                      <h2 className="flex items-center justify-between text-sm font-extrabold text-[#173d2b]">{lane.title}<span className="rounded-full bg-[#d7d2c5] px-2 py-0.5 text-[10px]">{laneTasks.length}</span></h2>
                       <p className="text-xs text-stone-500">{lane.helper}</p>
                     </div>
                     <div className="space-y-3">
                       {laneTasks.map((task) => (
                         <button
                           key={task.id}
-                          className="w-full rounded-lg border border-stone-200 bg-stone-50 p-3 text-left transition hover:border-emerald-500 hover:bg-emerald-50"
+                          className={`w-full rounded-xl border bg-[#fffdf7] p-3 text-left shadow-[0_2px_0_rgb(23_61_43_/_0.08)] transition hover:-translate-y-0.5 hover:border-[#799636] ${selectedTaskId === task.id ? "border-[#799636] ring-2 ring-[#dfff64]" : "border-[#d8d3c5]"}`}
                           onClick={() => {
                             setSelectedTaskId(task.id);
                             void generateReminder(task);
@@ -326,14 +341,14 @@ export default function TaskGoblinApp() {
         </div>
 
         <aside className="space-y-4">
-          <Card className="rounded-lg bg-white">
+          <Card className="bg-[#fffdf7]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="size-5 text-emerald-700" />
-                Supabase Auth
+                Save your den
               </CardTitle>
               <CardDescription>
-                Email magic links are the first auth path for project history.
+                Sign in to keep this board and its quest history.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -356,7 +371,7 @@ export default function TaskGoblinApp() {
           </Card>
 
           {selectedTask ? (
-            <Card className="rounded-lg bg-white">
+            <Card className="bg-[#fffdf7]">
               <CardHeader>
                 <CardTitle>{selectedTask.title}</CardTitle>
                 <CardDescription>{selectedTask.description}</CardDescription>
@@ -421,14 +436,14 @@ export default function TaskGoblinApp() {
             </Card>
           ) : null}
 
-          <Card className="rounded-lg bg-white">
+          <Card id="reminders" className="bg-[#173d2b] text-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Send className="size-5 text-emerald-700" />
-                Reminder Agent
+                Nudge workshop
               </CardTitle>
               <CardDescription>
-                Stage Telegram nudges in the Goblin voice that fits the moment.
+                Pick a voice. The Goblin handles the awkward follow-up.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -447,7 +462,7 @@ export default function TaskGoblinApp() {
                   </Button>
                 ))}
               </div>
-              <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm leading-6">
+              <div className="rounded-xl border border-white/15 bg-white/10 p-3 text-sm leading-6 text-[#f5f3e9]">
                 {reminderMessage}
               </div>
               <Button
@@ -462,7 +477,7 @@ export default function TaskGoblinApp() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg bg-white">
+          <Card className="bg-[#fffdf7]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="size-5 text-amber-600" />
@@ -491,20 +506,17 @@ export default function TaskGoblinApp() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg bg-white">
+          <Card className="bg-[#fffdf7]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="size-5 text-emerald-700" />
-                Pitch Notes
+                Why teams keep it
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm leading-6 text-stone-600">
-              <p>Jira for group chats.</p>
-              <p>Turns Telegram chaos into tasks, owners, deadlines, and reminders.</p>
-              <p>
-                Demo arc: upload messy chat, generate board, assign ghost task,
-                stage Telegram reminder, show project history.
-              </p>
+              <p>✓ No new workflow for the crew to learn.</p>
+              <p>✓ Every quest links back to the source message.</p>
+              <p>✓ Friendly pressure, delivered where work began.</p>
             </CardContent>
           </Card>
         </aside>
@@ -523,8 +535,8 @@ function StatusPill({
   value: string;
 }) {
   return (
-    <div className="flex min-h-20 gap-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
-      <div className="mt-0.5 text-emerald-700">{icon}</div>
+    <div className="flex min-h-20 gap-3 rounded-xl border border-[#d2cdbf] bg-[#f7f4eb] p-3">
+      <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-[#dfff64] text-[#173d2b]">{icon}</div>
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-normal text-stone-500">
           {label}
@@ -539,10 +551,21 @@ function StatusPill({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+    <div className="rounded-xl border border-[#d8d3c5] bg-[#f1eee4] p-3">
       <p className="text-xs font-medium text-stone-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+      <p className="mt-1 text-xl font-black text-[#173d2b]">{value}</p>
     </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <a href="#" className="flex items-center gap-2.5" aria-label="TaskGoblin home">
+      <span className="goblin-shadow-sm grid size-11 place-items-center overflow-hidden rounded-xl border-2 border-[#173d2b] bg-[#dfff64]" aria-hidden="true">
+        <Image src="/brand/taskgoblin-logo.png" alt="" width={44} height={44} className="size-11 object-contain" priority />
+      </span>
+      <span className="text-xl font-black tracking-[-0.04em] text-[#173d2b]">Task<span className="text-[#66852c]">Goblin</span></span>
+    </a>
   );
 }
 

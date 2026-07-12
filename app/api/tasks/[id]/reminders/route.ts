@@ -40,7 +40,7 @@ export async function POST(
   }
 
   const { data, error } = await supabase
-    .from("reminders")
+    .from("taskgoblin_reminders")
     .insert({
       task_id: id,
       channel: "telegram",

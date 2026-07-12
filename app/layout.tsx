@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TaskGoblin",
-  description: "Turns Telegram chats into tasks, owners, and reminders.",
+  title: "TaskGoblin — Turn chat into action",
+  description: "A tiny task wrangler that turns messy Telegram chats into clear owners, deadlines, and timely nudges.",
 };
 
 export default function RootLayout({
