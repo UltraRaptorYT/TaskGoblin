@@ -175,7 +175,7 @@ function createMockBriefScanResult(
     }));
 
   return {
-    summary: `${brief.chatName} contains ${sections.length} readable sections. Connect OpenAI for full semantic extraction; this preview has converted the opening sections into reviewable tasks.`,
+    summary: `${brief.chatName} contains ${sections.length} readable sections. Connect Gemini for full semantic extraction; this preview has converted the opening sections into reviewable tasks.`,
     projectHealth: {
       score: 55,
       label: "Needs review",

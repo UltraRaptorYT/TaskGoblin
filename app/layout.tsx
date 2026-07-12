@@ -13,8 +13,39 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TaskGoblin — Turn chat into action",
-  description: "A tiny task wrangler that turns messy Telegram chats into clear owners, deadlines, and timely nudges.",
+  title: {
+    default: "TaskGoblin — Turn project chaos into action",
+    template: "%s · TaskGoblin",
+  },
+  description:
+    "Upload a project brief or Telegram export and turn scattered context into clear tasks, owners, deadlines, risks, and timely nudges.",
+  applicationName: "TaskGoblin",
+  keywords: [
+    "AI project management",
+    "Telegram task extraction",
+    "project brief analyzer",
+    "team accountability",
+    "task board",
+  ],
+  authors: [{ name: "TaskGoblin" }],
+  creator: "TaskGoblin",
+  icons: {
+    icon: "/brand/taskgoblin-logo.png",
+    apple: "/brand/taskgoblin-logo.png",
+  },
+  openGraph: {
+    type: "website",
+    title: "TaskGoblin — Turn project chaos into action",
+    description:
+      "Turn project briefs and team conversations into accountable work in one scan.",
+    siteName: "TaskGoblin",
+  },
+  twitter: {
+    card: "summary",
+    title: "TaskGoblin — Turn project chaos into action",
+    description:
+      "Turn project briefs and team conversations into accountable work in one scan.",
+  },
 };
 
 export default function RootLayout({
@@ -25,9 +56,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

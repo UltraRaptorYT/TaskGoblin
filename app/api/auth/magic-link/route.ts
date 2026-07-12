@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-import { getSupabasePublic } from "@/lib/supabase-public";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
@@ -15,9 +15,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = getSupabasePublic();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabase) {
+  if (!url || !anonKey) {
     return NextResponse.json({
       sent: false,
       demoMode: true,
@@ -26,11 +27,25 @@ export async function POST(request: Request) {
     });
   }
 
+  const successResponse = NextResponse.json({
+    sent: true,
+    demoMode: false,
+    message: "Magic link sent. Check your email to continue.",
+  });
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll: () => [],
+      setAll: (cookies) => {
+        cookies.forEach(({ name, value, options }) => successResponse.cookies.set(name, value, options));
+      },
+    },
+  });
+
   const origin = new URL(request.url).origin;
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: origin,
+      emailRedirectTo: `${origin}/auth/callback`,
     },
   });
 
@@ -38,9 +53,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({
-    sent: true,
-    demoMode: false,
-    message: "Magic link sent. Check your email to continue.",
-  });
+  return successResponse;
 }

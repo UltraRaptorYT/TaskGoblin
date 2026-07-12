@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SafeRoute AI — Telegram Demo</title>
+    <meta
+      name="description"
+      content="A Telegram-style group chat demo that exports a TaskGoblin-compatible result.json file."
+    />
+    <style>
+      :root {
+        --app: #0e1824;
+        --panel: #172534;
+        --panel-2: #1d2c3c;
+        --line: #293a4c;
+        --muted: #7990a6;
+        --text: #e8f0f7;
+        --blue: #3595d6;
+        --blue-dark: #286b9c;
+        --cyan: #55c7e8;
+        --lime: #dfff64;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        overflow: hidden;
+        background: var(--app);
+        color: var(--text);
+        font:
+          14px/1.4 Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 310px 1fr;
+        height: 100dvh;
+      }
+      .sidebar {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: #14212e;
+      }
+      .side-top {
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+      }
+      .icon-button {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .icon-button:hover {
+        background: #213243;
+        color: white;
+      }
+      .search {
+        min-width: 0;
+        flex: 1;
+        border: 0;
+        border-radius: 22px;
+        background: #213143;
+        padding: 0 16px;
+        color: white;
+        outline: none;
+      }
+      .search::placeholder {
+        color: #74879a;
+      }
+      .chat-list {
+        overflow: auto;
+        padding: 4px 8px 12px;
+      }
+      .chat-item {
+        display: grid;
+        grid-template-columns: 50px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        padding: 9px 8px;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      .chat-item:hover {
+        background: #1c2c3c;
+      }
+      .chat-item.active {
+        background: #28618f;
+      }
+      .avatar {
+        display: grid;
+        width: 46px;
+        height: 46px;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff9b62, #ee5e58);
+        color: white;
+        font-size: 16px;
+        font-weight: 800;
+      }
+      .avatar.green {
+        background: linear-gradient(135deg, #83dc62, #36a745);
+      }
+      .avatar.purple {
+        background: linear-gradient(135deg, #b783ef, #6a4ab4);
+      }
+      .avatar.blue {
+        background: linear-gradient(135deg, #61d9ee, #278dcc);
+      }
+      .chat-copy {
+        min-width: 0;
+      }
+      .chat-name {
+        overflow: hidden;
+        font-weight: 750;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chat-preview {
+        overflow: hidden;
+        margin-top: 4px;
+        color: #83a1bb;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chat-item.active .chat-preview {
+        color: #c8deef;
+      }
+      .chat-time {
+        align-self: start;
+        padding-top: 2px;
+        color: #8396a8;
+        font-size: 12px;
+      }
+      .chat-item.active .chat-time {
+        color: #d6e8f5;
+      }
+      .conversation {
+        display: grid;
+        height: 100vh;
+        min-width: 0;
+        grid-template-rows: 72px auto 1fr 66px;
+        background:
+          radial-gradient(
+            circle at 20% 20%,
+            rgba(43, 84, 118, 0.18),
+            transparent 26%
+          ),
+          #0c1622;
+      }
+      .chat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        background: #162432;
+        padding: 0 20px;
+      }
+      .title-wrap {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
+      }
+      .mobile-back {
+        display: none;
+      }
+      .chat-title {
+        font-size: 16px;
+        font-weight: 800;
+      }
+      .member-count {
+        margin-top: 2px;
+        color: #7f9ab2;
+      }
+      .header-actions {
+        display: flex;
+        gap: 3px;
+      }
+      .pinned {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid #294157;
+        background: #1a2a39;
+        padding: 8px 18px;
+      }
+      .pin-line {
+        width: 3px;
+        height: 40px;
+        border-radius: 4px;
+        background: var(--blue);
+      }
+      .pin-copy {
+        min-width: 0;
+        flex: 1;
+      }
+      .pin-label {
+        color: #55b8f3;
+        font-weight: 750;
+      }
+      .pin-text {
+        overflow: hidden;
+        margin-top: 2px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .messages {
+        overflow: auto;
+        padding: 18px max(18px, calc((100vw - 1050px) / 2)) 24px;
+        scroll-behavior: smooth;
+      }
+      .day {
+        width: max-content;
+        margin: 4px auto 18px;
+        border-radius: 99px;
+        background: #1c3043cc;
+        padding: 5px 12px;
+        color: #abc0d2;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .message-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        margin: 5px 0;
+      }
+      .message-row.mine {
+        justify-content: flex-end;
+      }
+      .message-avatar {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        background: #39a9d3;
+        color: white;
+        font-size: 12px;
+        font-weight: 850;
+      }
+      .bubble {
+        position: relative;
+        max-width: min(640px, 72%);
+        border-radius: 16px 16px 16px 5px;
+        background: #1b2d3e;
+        padding: 8px 12px 7px;
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+      }
+      .mine .bubble {
+        border-radius: 16px 16px 5px 16px;
+        background: #2f6898;
+      }
+      .sender {
+        margin-bottom: 2px;
+        color: var(--cyan);
+        font-size: 13px;
+        font-weight: 750;
+      }
+      .message-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        float: right;
+        margin: 5px 0 -2px 10px;
+        color: #829bb0;
+        font-size: 11px;
+      }
+      .mine .meta {
+        color: #a9d3ef;
+      }
+      .checks {
+        color: #65c4ff;
+        font-weight: 900;
+      }
+      .composer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        background: #162432;
+        padding: 10px 14px;
+      }
+      .sender-select {
+        height: 42px;
+        max-width: 145px;
+        border: 1px solid #304358;
+        border-radius: 11px;
+        background: #1e3042;
+        padding: 0 10px;
+        color: #bdd0df;
+        outline: none;
+      }
+      .message-input {
+        height: 44px;
+        min-width: 0;
+        flex: 1;
+        border: 0;
+        border-radius: 22px;
+        background: #1e3042;
+        padding: 0 18px;
+        color: white;
+        outline: none;
+      }
+      .message-input::placeholder {
+        color: #71869a;
+      }
+      .send {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        background: var(--blue);
+        color: white;
+        cursor: pointer;
+      }
+      .send:hover {
+        background: #44a6e7;
+      }
+      .export-wrap {
+        position: relative;
+      }
+      .export {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #3b5369;
+        border-radius: 10px;
+        background: #203447;
+        padding: 9px 12px;
+        color: white;
+        font-weight: 750;
+        cursor: pointer;
+      }
+      .export:hover {
+        background: #29435a;
+      }
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 82px;
+        z-index: 20;
+        max-width: 360px;
+        translate: 0 20px;
+        border: 1px solid #426174;
+        border-radius: 12px;
+        background: #203547;
+        padding: 11px 14px;
+        color: #dceaf4;
+        opacity: 0;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+        transition: 0.2s;
+        pointer-events: none;
+      }
+      .toast.show {
+        translate: 0;
+        opacity: 1;
+      }
+      .brand-mini {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 14px 16px 8px;
+        color: #a9bece;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .brand-mini img {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        background: var(--lime);
+      }
+      .brand-mini b {
+        color: var(--lime);
+      }
+      svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      @media (max-width: 760px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          display: none;
+        }
+        .mobile-back {
+          display: grid;
+        }
+        .chat-header {
+          padding: 0 10px;
+        }
+        .header-actions .optional {
+          display: none;
+        }
+        .messages {
+          padding: 16px 10px 22px;
+        }
+        .bubble {
+          max-width: 82%;
+        }
+        .sender-select {
+          width: 78px;
+          padding: 0 6px;
+        }
+        .export span {
+          display: none;
+        }
+        .export {
+          padding: 9px;
+        }
+        .pinned {
+          padding-inline: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <div class="side-top">
+          <button class="icon-button" aria-label="Menu">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg></button
+          ><input
+            class="search"
+            placeholder="Search"
+            aria-label="Search chats"
+          />
+        </div>
+        <div class="brand-mini">
+          <img src="./brand/taskgoblin-logo.png" alt="" /><span
+            >TaskGoblin <b>demo chat</b></span
+          >
+        </div>
+        <div class="chat-list">
+          <button class="chat-item">
+            <span class="avatar purple">DS</span
+            ><span class="chat-copy"
+              ><span class="chat-name">Data Science Club</span
+              ><span class="chat-preview">Meeting moved to Thursday</span></span
+            ><span class="chat-time">10:42</span>
+          </button>
+          <button class="chat-item">
+            <span class="avatar green">PA</span
+            ><span class="chat-copy"
+              ><span class="chat-name">PAI Announcements</span
+              ><span class="chat-preview"
+                >CA project briefing slides</span
+              ></span
+            ><span class="chat-time">Tue</span>
+          </button>
+          <button class="chat-item active">
+            <span class="avatar">SR</span
+            ><span class="chat-copy"
+              ><span class="chat-name">SafeRoute AI — Group Project</span
+              ><span class="chat-preview" id="preview"
+                >Final deliverables checklist…</span
+              ></span
+            ><span class="chat-time" id="side-time">09:06</span>
+          </button>
+          <button class="chat-item">
+            <span class="avatar blue">BT</span
+            ><span class="chat-copy"
+              ><span class="chat-name">Ben Tan</span
+              ><span class="chat-preview">The ETL is working now</span></span
+            ><span class="chat-time">Mon</span>
+          </button>
+          <button class="chat-item">
+            <span class="avatar purple">CL</span
+            ><span class="chat-copy"
+              ><span class="chat-name">Chloe Lim</span
+              ><span class="chat-preview">XGBoost is still winning</span></span
+            ><span class="chat-time">Fri</span>
+          </button>
+        </div>
+      </aside>
+
+      <section class="conversation">
+        <header class="chat-header">
+          <div class="title-wrap">
+            <button class="icon-button mobile-back" aria-label="Back">
+              <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg></button
+            ><span
+              ><span class="chat-title">SafeRoute AI — Group Project</span
+              ><span class="member-count">4 members</span></span
+            >
+          </div>
+          <div class="header-actions">
+            <button class="icon-button optional" aria-label="Search messages">
+              <svg viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-4-4" />
+              </svg>
+            </button>
+            <div class="export-wrap">
+              <button class="export" id="export" type="button">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" /></svg
+                ><span>Export chat</span>
+              </button>
+            </div>
+            <button class="icon-button optional" aria-label="More">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="5" r="1" />
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="12" cy="19" r="1" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="pinned">
+          <span class="pin-line"></span>
+          <div class="pin-copy">
+            <div class="pin-label">Pinned message</div>
+            <div class="pin-text">
+              Project brief: build SafeRoute AI with SQL, ETL, EDA, dashboard,
+              machine-learning experiments and a desktop prediction GUI.
+            </div>
+          </div>
+          <button class="icon-button" aria-label="Close pinned message">
+            <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+
+        <div class="messages" id="messages">
+          <div class="day">15 September 2026</div>
+        </div>
+
+        <form class="composer" id="composer">
+          <select class="sender-select" id="sender" aria-label="Send as">
+            <option>Aisha Rahman</option>
+            <option>Ben Tan</option>
+            <option>Chloe Lim</option>
+            <option>Daniel Wong</option>
+          </select>
+          <input
+            class="message-input"
+            id="message"
+            autocomplete="off"
+            placeholder="Write a message…"
+            aria-label="Message"
+            maxlength="2000"
+          />
+          <button class="send" type="submit" aria-label="Send message">
+            <svg viewBox="0 0 24 24">
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          </button>
+        </form>
+      </section>
+    </main>
+    <div class="toast" id="toast" role="status"></div>
+
+    <script>
+      const people = {
+        "Aisha Rahman": { id: "user1001", initials: "AR", color: "#e3695c" },
+        "Ben Tan": { id: "user1002", initials: "BT", color: "#3fa8d4" },
+        "Chloe Lim": { id: "user1003", initials: "CL", color: "#8b6ed5" },
+        "Daniel Wong": { id: "user1004", initials: "DW", color: "#55b864" },
+      };
+      const seed = [
+        [
+          "Aisha Rahman",
+          "Ten days to demo. Open items: shrink executable, complete final report, finish slides, rehearse the 20-minute presentation, update Scrum records and collect peer evaluations.",
+          "09:06",
+        ],
+        [
+          "Ben Tan",
+          "I can investigate a smaller executable build, but I have not committed to a deadline yet.",
+          "09:09",
+        ],
+        [
+          "Chloe Lim",
+          "Model tuning is complete. XGBoost has F1 0.82 and recall 0.86. All experiments and artifacts are tracked in MLflow.",
+          "09:12",
+        ],
+        [
+          "Daniel Wong",
+          "The GUI works with the exported model. I still need to add input validation and package the final build by Friday 5 PM.",
+          "09:15",
+        ],
+        [
+          "Aisha Rahman",
+          "Who owns the final Scrum report? It is still unassigned and we need all bi-weekly updates included.",
+          "09:18",
+        ],
+        [
+          "Ben Tan",
+          "I will take the Scrum report. First draft by tomorrow 8 PM. Aisha, can you review it after that?",
+          "09:21",
+        ],
+        [
+          "Aisha Rahman",
+          "Confirmed. I’ll review the Scrum report by Thursday noon. Daniel owns the slides and Chloe owns the demo model explanation.",
+          "09:24",
+        ],
+        [
+          "Daniel Wong",
+          "Slides draft will be ready Wednesday night. Blocker: I need the final confusion matrix and feature importance chart from Chloe.",
+          "09:28",
+        ],
+        ["Chloe Lim", "I’ll send both charts today by 4 PM.", "09:30"],
+        [
+          "Aisha Rahman",
+          "Great. Final rehearsal is booked for 23 September, 3 PM. Everyone must attend with their section ready.",
+          "09:33",
+        ],
+      ];
+      const state = {
+        name: "SafeRoute AI — Group Project",
+        type: "private_group",
+        id: 6842193057,
+        messages: [],
+      };
+      const messagesEl = document.querySelector("#messages"),
+        form = document.querySelector("#composer"),
+        input = document.querySelector("#message"),
+        sender = document.querySelector("#sender"),
+        toast = document.querySelector("#toast");
+      seed.forEach((item, index) =>
+        state.messages.push(
+          makeMessage(index + 1, item[0], item[1], `2026-09-15T${item[2]}:00`),
+        ),
+      );
+      function makeMessage(id, from, text, date) {
+        return {
+          id,
+          type: "message",
+          date,
+          date_unixtime: String(Math.floor(new Date(date).getTime() / 1000)),
+          from,
+          from_id: people[from].id,
+          text,
+          text_entities: [{ type: "plain", text }],
+        };
+      }
+      function escapeHtml(value) {
+        return value.replace(
+          /[&<>'"]/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              "'": "&#39;",
+              '"': "&quot;",
+            })[char],
+        );
+      }
+      function timeOf(date) {
+        return new Date(date).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+      function render() {
+        messagesEl
+          .querySelectorAll(".message-row")
+          .forEach((node) => node.remove());
+        state.messages.forEach((message) => {
+          const mine = message.from === "Aisha Rahman",
+            person = people[message.from],
+            row = document.createElement("div");
+          row.className = `message-row${mine ? " mine" : ""}`;
+          row.innerHTML = `${mine ? "" : `<span class="message-avatar" style="background:${person.color}">${person.initials}</span>`}<div class="bubble">${mine ? "" : `<div class="sender">${escapeHtml(message.from)}</div>`}<span class="message-text">${escapeHtml(message.text)}</span><span class="meta">${timeOf(message.date)}${mine ? '<span class="checks">✓✓</span>' : ""}</span></div>`;
+          messagesEl.appendChild(row);
+        });
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        const last = state.messages.at(-1);
+        document.querySelector("#preview").textContent = last.text;
+        document.querySelector("#side-time").textContent = timeOf(last.date);
+      }
+      function notify(text) {
+        toast.textContent = text;
+        toast.classList.add("show");
+        clearTimeout(notify.timer);
+        notify.timer = setTimeout(() => toast.classList.remove("show"), 2400);
+      }
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        state.messages.push(
+          makeMessage(
+            state.messages.length + 1,
+            sender.value,
+            text,
+            new Date().toISOString(),
+          ),
+        );
+        input.value = "";
+        render();
+        notify("Message added to the demo export");
+      });
+      document.querySelector("#export").addEventListener("click", () => {
+        const service = {
+          id: 0,
+          type: "service",
+          date: "2026-09-15T08:55:00",
+          date_unixtime: "1789452900",
+          actor: "Aisha Rahman",
+          actor_id: "user1001",
+          action: "create_group",
+          title: state.name,
+          members: Object.keys(people),
+          text: `Aisha Rahman created group “${state.name}”`,
+          text_entities: [],
+        };
+        const payload = {
+          ...state,
+          messages: [
+            service,
+            ...state.messages.map((message, index) => ({
+              ...message,
+              id: index + 1,
+            })),
+          ],
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+            type: "application/json",
+          }),
+          url = URL.createObjectURL(blob),
+          link = document.createElement("a");
+        link.href = url;
+        link.download = "result.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        notify("Exported result.json — upload it to TaskGoblin");
+      });
+      render();
+    </script>
+  </body>
+</html>

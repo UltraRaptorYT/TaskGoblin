@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
 import { createMockScanResult } from "@/lib/mock-scan";
 import type {
@@ -56,8 +56,8 @@ const TASK_SCAN_SCHEMA = {
             id: { type: "string" },
             title: { type: "string" },
             description: { type: "string" },
-            owner: { anyOf: [{ type: "string" }, { type: "null" }] },
-            deadline: { anyOf: [{ type: "string" }, { type: "null" }] },
+            owner: { type: ["string", "null"] },
+            deadline: { type: ["string", "null"] },
             status: {
               type: "string",
               enum: ["backlog", "todo", "doing", "blocked", "done", "overdue"],
@@ -86,7 +86,7 @@ const TASK_SCAN_SCHEMA = {
           properties: {
             id: { type: "string" },
             text: { type: "string" },
-            owner: { anyOf: [{ type: "string" }, { type: "null" }] },
+            owner: { type: ["string", "null"] },
             sourceMessageIds: { type: "array", items: { type: "number" } },
           },
         },
@@ -132,9 +132,9 @@ const TASK_SCAN_SCHEMA = {
           required: ["id", "taskId", "message", "blockedBy", "sourceMessageIds"],
           properties: {
             id: { type: "string" },
-            taskId: { anyOf: [{ type: "string" }, { type: "null" }] },
+            taskId: { type: ["string", "null"] },
             message: { type: "string" },
-            blockedBy: { anyOf: [{ type: "string" }, { type: "null" }] },
+            blockedBy: { type: ["string", "null"] },
             sourceMessageIds: { type: "array", items: { type: "number" } },
           },
         },
@@ -169,8 +169,8 @@ async function scanImport(
   telegramImport: NormalizedTelegramImport,
   sourceKind: "Telegram conversation" | "project brief"
 ): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL ?? "gpt-5.5";
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
 
   if (!apiKey) {
     return {
@@ -180,33 +180,24 @@ async function scanImport(
     };
   }
 
-  const client = new OpenAI({ apiKey });
+  const client = new GoogleGenAI({ apiKey });
   const transcript = buildTranscript(telegramImport);
 
-  const response = await client.responses.create({
+  const response = await client.models.generateContent({
     model,
-    input: [
-      {
-        role: "system",
-        content:
-          `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Goblin tone may be playful, but never cruel.`,
-      },
-      {
-        role: "user",
-        content: `Source type: ${sourceKind}\nProject: ${telegramImport.chatName}\nParticipants: ${telegramImport.participants
-          .map((participant) => participant.name)
-          .join(", ") || "Not explicitly listed"}\n\nSource content:\n${transcript}`,
-      },
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        ...TASK_SCAN_SCHEMA,
-      },
+    contents: `Source type: ${sourceKind}\nProject: ${telegramImport.chatName}\nParticipants: ${telegramImport.participants
+      .map((participant) => participant.name)
+      .join(", ") || "Not explicitly listed"}\n\nSource content:\n${transcript}`,
+    config: {
+      systemInstruction:
+        `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Goblin tone may be playful, but never cruel.`,
+      responseMimeType: "application/json",
+      responseJsonSchema: TASK_SCAN_SCHEMA.schema,
     },
   });
 
-  const text = response.output_text;
+  const text = response.text;
+  if (!text) throw new Error("Gemini returned an empty task scan.");
 
   return {
     result: JSON.parse(text) as TaskScanResult,

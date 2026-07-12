@@ -1,0 +1,410 @@
+{
+  "name": "SafeRoute AI — Group Project",
+  "type": "private_group",
+  "id": 6842193057,
+  "messages": [
+    {
+      "id": 1,
+      "type": "service",
+      "date": "2026-08-03T09:00:00",
+      "date_unixtime": "1785728400",
+      "actor": "Aisha Rahman",
+      "actor_id": "user1001",
+      "action": "create_group",
+      "title": "SafeRoute AI — Group Project",
+      "members": ["Aisha Rahman", "Ben Tan", "Chloe Lim", "Daniel Wong"],
+      "text": "Aisha Rahman created group “SafeRoute AI — Group Project”",
+      "text_entities": []
+    },
+    {
+      "id": 2,
+      "type": "message",
+      "date": "2026-08-03T09:04:00",
+      "date_unixtime": "1785728640",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Hey everyone! Our group project is to build SafeRoute AI, a portable application that helps a transport company understand risky driving behaviour and predict unsafe trips.",
+      "text_entities": [{ "type": "plain", "text": "Hey everyone! Our group project is to build SafeRoute AI, a portable application that helps a transport company understand risky driving behaviour and predict unsafe trips." }]
+    },
+    {
+      "id": 3,
+      "type": "message",
+      "date": "2026-08-03T09:08:00",
+      "date_unixtime": "1785728880",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "I read the brief. Phase 1 needs SQL Server storage, three useful SQL queries, an ETL pipeline to Python, EDA, visualisations and an interactive dashboard.",
+      "text_entities": []
+    },
+    {
+      "id": 4,
+      "type": "message",
+      "date": "2026-08-03T09:10:00",
+      "date_unixtime": "1785729000",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "Phase 2 adds feature engineering, model selection and optimisation, MLflow experiment tracking, plus a desktop prediction GUI.",
+      "text_entities": []
+    },
+    {
+      "id": 5,
+      "type": "message",
+      "date": "2026-08-03T09:13:00",
+      "date_unixtime": "1785729180",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "Let’s split roles: Ben data engineer, Chloe data scientist, I handle dashboard and GUI, Aisha handles product coordination and business analysis. We can still review one another’s work.",
+      "text_entities": []
+    },
+    {
+      "id": 6,
+      "type": "message",
+      "date": "2026-08-03T09:15:00",
+      "date_unixtime": "1785729300",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Agreed. First milestone: working data pipeline and dashboard prototype by 21 August. Final demo is 25 September at 2 PM.",
+      "text_entities": [{ "type": "bold", "text": "Agreed." }, { "type": "plain", "text": " First milestone: working data pipeline and dashboard prototype by 21 August. Final demo is 25 September at 2 PM." }]
+    },
+    {
+      "id": 7,
+      "type": "message",
+      "date": "2026-08-03T09:19:00",
+      "date_unixtime": "1785729540",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "I’ll design the SQL schema and load the raw telematics CSV files by Friday 7 August, 6 PM. I’ll also draft the three complex queries.",
+      "text_entities": []
+    },
+    {
+      "id": 8,
+      "type": "message",
+      "date": "2026-08-03T09:21:00",
+      "date_unixtime": "1785729660",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "Once Ben’s cleaned extract is ready, I’ll finish the EDA notebook and baseline model by 14 August. I need a data dictionary before I can confirm the features.",
+      "text_entities": []
+    },
+    {
+      "id": 9,
+      "type": "message",
+      "date": "2026-08-03T09:23:00",
+      "date_unixtime": "1785729780",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "I can create the Power BI dashboard shell this week. Who is writing the user stories and product backlog?",
+      "text_entities": []
+    },
+    {
+      "id": 10,
+      "type": "message",
+      "date": "2026-08-03T09:27:00",
+      "date_unixtime": "1785730020",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "I’ll own the user stories and initial product backlog. Draft due Wednesday 5 August. We need at least managers, administrators, and drivers represented.",
+      "text_entities": []
+    },
+    {
+      "id": 11,
+      "type": "message",
+      "date": "2026-08-03T09:31:00",
+      "date_unixtime": "1785730260",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "Decision: use accident risk as the prediction target and compare logistic regression, random forest and XGBoost. Metrics should include recall and F1, not only accuracy.",
+      "text_entities": []
+    },
+    {
+      "id": 12,
+      "type": "message",
+      "date": "2026-08-03T09:33:00",
+      "date_unixtime": "1785730380",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "Sounds good. The dataset is around seven million rows, so I’ll load it in chunks and index vehicle_id, trip_id and timestamp.",
+      "text_entities": []
+    },
+    {
+      "id": 13,
+      "type": "message",
+      "date": "2026-08-04T16:02:00",
+      "date_unixtime": "1785849720",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "I uploaded the project brief and meeting notes to the shared drive. Please add your acceptance criteria to the backlog before tomorrow’s stand-up.",
+      "text_entities": []
+    },
+    {
+      "id": 14,
+      "type": "message",
+      "date": "2026-08-05T11:18:00",
+      "date_unixtime": "1785919080",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "Dashboard plan: overview KPIs, risky behaviour trends, driver comparison, map of incidents, and filters for date and vehicle type. Prototype by 12 August.",
+      "text_entities": []
+    },
+    {
+      "id": 15,
+      "type": "message",
+      "date": "2026-08-05T11:24:00",
+      "date_unixtime": "1785919440",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Great. Please make sure a manager can answer: which behaviours contribute most to dangerous trips?",
+      "text_entities": []
+    },
+    {
+      "id": 16,
+      "type": "message",
+      "date": "2026-08-07T17:42:00",
+      "date_unixtime": "1786114920",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "Blocker: the raw CSV has inconsistent timestamp formats and about 18% missing speed values. The SQL load will be late unless we agree on an imputation rule.",
+      "text_entities": []
+    },
+    {
+      "id": 17,
+      "type": "message",
+      "date": "2026-08-07T17:48:00",
+      "date_unixtime": "1786115280",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "Don’t impute speed blindly. Keep a missing-value flag, remove impossible readings, and compare median-by-road-type against dropping those rows. I can test this tomorrow morning.",
+      "text_entities": []
+    },
+    {
+      "id": 18,
+      "type": "message",
+      "date": "2026-08-07T17:51:00",
+      "date_unixtime": "1786115460",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Decision recorded. Ben, revise the ETL deadline to Monday 10 August noon. Chloe will send the missing-value recommendation by Saturday 2 PM.",
+      "text_entities": []
+    },
+    {
+      "id": 19,
+      "type": "message",
+      "date": "2026-08-08T14:35:00",
+      "date_unixtime": "1786199700",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "Recommendation sent: retain rows, add speed_missing, and use road-type median for the dashboard only. For modelling, compare imputation inside cross-validation to avoid leakage.",
+      "text_entities": []
+    },
+    {
+      "id": 20,
+      "type": "message",
+      "date": "2026-08-10T12:26:00",
+      "date_unixtime": "1786364760",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "ETL v1 is working and the database has 6.8 million valid rows. Query 1 identifies speeding hotspots; query 2 compares harsh braking by driver; query 3 still needs an owner to validate the business meaning.",
+      "text_entities": []
+    },
+    {
+      "id": 21,
+      "type": "message",
+      "date": "2026-08-10T12:31:00",
+      "date_unixtime": "1786365060",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "I’ll validate query 3 with the manager user story by 11 August, 5 PM. Please send me the query and sample output.",
+      "text_entities": []
+    },
+    {
+      "id": 22,
+      "type": "message",
+      "date": "2026-08-12T18:14:00",
+      "date_unixtime": "1786558440",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "Dashboard prototype is ready, but the incident map is blocked because we don’t have latitude and longitude in the cleaned table.",
+      "text_entities": []
+    },
+    {
+      "id": 23,
+      "type": "message",
+      "date": "2026-08-12T18:19:00",
+      "date_unixtime": "1786558740",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "I excluded location fields because of nulls. I can add the valid coordinates to the view by tomorrow 3 PM.",
+      "text_entities": []
+    },
+    {
+      "id": 24,
+      "type": "message",
+      "date": "2026-08-14T20:05:00",
+      "date_unixtime": "1786747500",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "EDA and baseline notebook are complete. Harsh braking frequency and overspeed duration are the strongest initial signals. Baseline F1 is 0.71.",
+      "text_entities": []
+    },
+    {
+      "id": 25,
+      "type": "message",
+      "date": "2026-08-14T20:09:00",
+      "date_unixtime": "1786747740",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "Nice. I’ll connect those findings to the dashboard narrative. Someone should start the Phase 1 report and slides soon.",
+      "text_entities": []
+    },
+    {
+      "id": 26,
+      "type": "message",
+      "date": "2026-08-15T09:17:00",
+      "date_unixtime": "1786799820",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "I can probably start the report this weekend.",
+      "text_entities": []
+    },
+    {
+      "id": 27,
+      "type": "message",
+      "date": "2026-08-18T10:02:00",
+      "date_unixtime": "1787066520",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "Reminder: our pipeline/dashboard milestone is Friday. Has anyone confirmed who owns the presentation slides and Scrum report?",
+      "text_entities": []
+    },
+    {
+      "id": 28,
+      "type": "message",
+      "date": "2026-08-18T10:08:00",
+      "date_unixtime": "1787066880",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "I can design the slides if Aisha supplies the storyline by Thursday. Scrum report still has no confirmed owner.",
+      "text_entities": []
+    },
+    {
+      "id": 29,
+      "type": "message",
+      "date": "2026-08-18T10:12:00",
+      "date_unixtime": "1787067120",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Confirmed: I’ll send the storyline Thursday 20 August noon. Daniel owns the slides, first draft due 23 August. We still need someone for the Scrum report.",
+      "text_entities": []
+    },
+    {
+      "id": 30,
+      "type": "message",
+      "date": "2026-08-21T17:36:00",
+      "date_unixtime": "1787351760",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Milestone review: database and ETL done, EDA done, dashboard mostly done. The location filter is still buggy and the report has only an outline.",
+      "text_entities": []
+    },
+    {
+      "id": 31,
+      "type": "message",
+      "date": "2026-08-21T17:42:00",
+      "date_unixtime": "1787352120",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "I’ll fix the location filter by Monday 24 August, 4 PM. I’m blocked until Ben republishes the coordinate view.",
+      "text_entities": []
+    },
+    {
+      "id": 32,
+      "type": "message",
+      "date": "2026-08-21T17:45:00",
+      "date_unixtime": "1787352300",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "I’ll publish the corrected coordinate view tonight by 9 PM.",
+      "text_entities": []
+    },
+    {
+      "id": 33,
+      "type": "message",
+      "date": "2026-08-26T14:08:00",
+      "date_unixtime": "1787762880",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "For Phase 2, I’ll run feature selection and tune random forest/XGBoost by 4 September. I’ll track parameters, metrics and artifacts in MLflow.",
+      "text_entities": []
+    },
+    {
+      "id": 34,
+      "type": "message",
+      "date": "2026-08-26T14:13:00",
+      "date_unixtime": "1787763180",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "I’ll build the desktop prediction GUI after Chloe freezes the model interface. Target for working GUI: 11 September.",
+      "text_entities": []
+    },
+    {
+      "id": 35,
+      "type": "message",
+      "date": "2026-08-26T14:17:00",
+      "date_unixtime": "1787763420",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Final deliverables checklist: report under 20 pages, notebook, executable GUI, slides under 30 pages, product backlog, bi-weekly Scrum reports and individual peer evaluations.",
+      "text_entities": []
+    },
+    {
+      "id": 36,
+      "type": "message",
+      "date": "2026-09-04T19:22:00",
+      "date_unixtime": "1788549720",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "Model tuning complete. XGBoost wins with F1 0.82 and recall 0.86. Need Daniel to confirm the input/output contract before I export the model.",
+      "text_entities": []
+    },
+    {
+      "id": 37,
+      "type": "message",
+      "date": "2026-09-04T19:29:00",
+      "date_unixtime": "1788550140",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "I’ll confirm the GUI contract tomorrow before noon. Inputs: overspeed duration, harsh braking count, trip distance and weather category. Output: risk probability plus Low/Medium/High label.",
+      "text_entities": []
+    },
+    {
+      "id": 38,
+      "type": "message",
+      "date": "2026-09-12T13:11:00",
+      "date_unixtime": "1789218660",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "GUI is one day late but working now. The packaged executable is 480 MB, so I need to reduce its size before submission.",
+      "text_entities": []
+    },
+    {
+      "id": 39,
+      "type": "message",
+      "date": "2026-09-12T13:18:00",
+      "date_unixtime": "1789219080",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "I can investigate a smaller build, but I have not committed to a deadline yet.",
+      "text_entities": []
+    },
+    {
+      "id": 40,
+      "type": "message",
+      "date": "2026-09-15T09:06:00",
+      "date_unixtime": "1789453560",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "Ten days to demo. Open items: shrink executable, complete final report, finish slides, rehearse 20-minute presentation, update Scrum records and collect peer evaluations. Please claim anything without an owner today.",
+      "text_entities": []
+    }
+  ]
+}
