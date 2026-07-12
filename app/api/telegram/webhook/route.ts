@@ -2,16 +2,53 @@ import { NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+type TelegramUpdate = {
+  update_id?: number;
+  message?: {
+    message_id?: number;
+    text?: string;
+    chat?: { id?: number; type?: string; title?: string };
+    from?: { first_name?: string; username?: string };
+  };
+};
+
 export async function POST(request: Request) {
-  const update = (await request.json().catch(() => null)) as unknown;
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const receivedSecret = request.headers.get("x-telegram-bot-api-secret-token");
+
+  if (expectedSecret && receivedSecret !== expectedSecret) {
+    return NextResponse.json({ error: "Invalid webhook secret." }, { status: 401 });
+  }
+
+  const update = (await request.json().catch(() => null)) as TelegramUpdate | null;
+  if (!update) {
+    return NextResponse.json({ error: "Invalid Telegram update." }, { status: 400 });
+  }
+
   const supabase = getSupabaseAdmin();
+  const text = update.message?.text?.trim() ?? "";
+  const chatId = update.message?.chat?.id;
+  let replySent = false;
+
+  if (chatId && isCommand(text, "start")) {
+    const firstName = update.message?.from?.first_name;
+    replySent = await sendTelegramMessage(
+      chatId,
+      `${firstName ? `Hey ${firstName}! ` : ""}I’m TaskGoblin. 🧌\n\nI turn project chats into clear tasks, owners, deadlines, and reminders. Add me to a project group, then upload the Telegram export or project brief in TaskGoblin to build your board.\n\nUse /help to see what I can do.`,
+    );
+  } else if (chatId && isCommand(text, "help")) {
+    replySent = await sendTelegramMessage(
+      chatId,
+      "TaskGoblin commands:\n/start — introduce the bot\n/help — show this guide\n\nLive chat scanning and scheduled Telegram delivery are the next automation steps. You can already import a Telegram result.json or ZIP in the TaskGoblin app.",
+    );
+  }
 
   if (!supabase) {
     return NextResponse.json({
       ok: true,
       persisted: false,
-      message:
-        "Telegram webhook received in demo mode. Configure Supabase to store bot updates.",
+      replySent,
+      message: "Telegram webhook processed in demo mode.",
     });
   }
 
@@ -25,5 +62,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persisted: true });
+  return NextResponse.json({ ok: true, persisted: true, replySent });
+}
+
+function isCommand(text: string, command: string) {
+  return new RegExp(`^/${command}(?:@\\w+)?(?:\\s|$)`, "i").test(text);
+}
+
+async function sendTelegramMessage(chatId: number, text: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return false;
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text }),
+      },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
