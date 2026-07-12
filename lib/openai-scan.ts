@@ -156,6 +156,19 @@ const TASK_SCAN_SCHEMA = {
 export async function scanTelegramImport(
   telegramImport: NormalizedTelegramImport
 ): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
+  return scanImport(telegramImport, "Telegram conversation");
+}
+
+export async function scanProjectBrief(
+  projectBrief: NormalizedTelegramImport
+): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
+  return scanImport(projectBrief, "project brief");
+}
+
+async function scanImport(
+  telegramImport: NormalizedTelegramImport,
+  sourceKind: "Telegram conversation" | "project brief"
+): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL ?? "gpt-5.5";
 
@@ -176,13 +189,13 @@ export async function scanTelegramImport(
       {
         role: "system",
         content:
-          "You are TaskGoblin, an AI project manager. Extract only facts supported by the Telegram transcript. Do not invent owners or deadlines. Use null where unknown. Goblin tone may be playful, but never cruel.",
+          `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Goblin tone may be playful, but never cruel.`,
       },
       {
         role: "user",
-        content: `Chat: ${telegramImport.chatName}\nParticipants: ${telegramImport.participants
+        content: `Source type: ${sourceKind}\nProject: ${telegramImport.chatName}\nParticipants: ${telegramImport.participants
           .map((participant) => participant.name)
-          .join(", ")}\n\nTranscript:\n${transcript}`,
+          .join(", ") || "Not explicitly listed"}\n\nSource content:\n${transcript}`,
       },
     ],
     text: {

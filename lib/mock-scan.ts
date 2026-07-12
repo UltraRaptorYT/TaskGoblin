@@ -7,6 +7,10 @@ import type {
 export function createMockScanResult(
   telegramImport: NormalizedTelegramImport
 ): TaskScanResult {
+  if (telegramImport.chatType.startsWith("project_brief_")) {
+    return createMockBriefScanResult(telegramImport);
+  }
+
   const textMessages = telegramImport.messages.filter((message) =>
     message.text.trim()
   );
@@ -144,6 +148,59 @@ export function createMockScanResult(
         "Hey team, small nudge: deployment is still floating around without an owner. Who can grab it before demo prep gets spicy?",
       goblin:
         "The deployment task is wandering around ownerless. Please adopt it before the deadline adopts us.",
+    },
+  };
+}
+
+function createMockBriefScanResult(
+  brief: NormalizedTelegramImport
+): TaskScanResult {
+  const sections = brief.messages.filter((message) => message.text.trim());
+  const first = sections[0];
+  const second = sections[1];
+  const third = sections[2];
+  const tasks: TaskItem[] = [first, second, third]
+    .filter((section): section is NonNullable<typeof section> => Boolean(section))
+    .map((section, index) => ({
+      id: `brief-task-${index + 1}`,
+      title: section.text.split(/[.!?\n]/)[0].slice(0, 72) || `Brief item ${index + 1}`,
+      description: section.text.slice(0, 240),
+      owner: null,
+      deadline: null,
+      status: "backlog",
+      priority: index === 0 ? "high" : "medium",
+      confidence: 0.62,
+      sourceMessageIds: [section.id],
+      sourceSnippet: section.text.slice(0, 180),
+    }));
+
+  return {
+    summary: `${brief.chatName} contains ${sections.length} readable sections. Connect OpenAI for full semantic extraction; this preview has converted the opening sections into reviewable tasks.`,
+    projectHealth: {
+      score: 55,
+      label: "Needs review",
+      explanation: "The brief was imported, but owners and deadlines need confirmation.",
+    },
+    tasks,
+    decisions: [],
+    questions: [{
+      id: "brief-question-ownership",
+      text: "Who owns each deliverable in this brief?",
+      sourceMessageIds: ids(sections.slice(0, 1)),
+    }],
+    risks: [{
+      id: "brief-risk-ownership",
+      type: "ghost_task",
+      severity: "medium",
+      message: "The imported deliverables do not have confirmed owners.",
+      reason: "Mock mode does not infer ownership from project briefs.",
+      sourceMessageIds: ids(sections.slice(0, 1)),
+    }],
+    blockers: [],
+    accountabilitySuggestions: {
+      professional: "Please review the imported deliverables and confirm an owner and deadline for each item.",
+      friendly: "The brief is mapped—who wants to claim each quest and add a deadline?",
+      goblin: "Fresh quests have entered the den. Please assign their keepers before they wander off.",
     },
   };
 }
