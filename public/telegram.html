@@ -293,6 +293,46 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      .reply-preview {
+        margin-bottom: 7px;
+        border-left: 3px solid #63b8ec;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.055);
+        padding: 5px 8px;
+        color: #a8c4d8;
+        font-size: 12px;
+      }
+      .media-preview {
+        display: grid;
+        min-height: 128px;
+        margin: -3px -7px 7px;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 12px;
+        background: radial-gradient(circle at 30% 25%, #426584 0 4%, transparent 5%), linear-gradient(145deg, #263f54, #122231);
+        color: white;
+        text-align: center;
+      }
+      .media-preview.sticker {
+        min-height: 104px;
+        background: transparent;
+        font-size: 72px;
+      }
+      .gif-label {
+        border-radius: 7px;
+        background: rgba(0, 0, 0, 0.48);
+        padding: 5px 8px;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+      }
+      .meme-copy {
+        padding: 18px;
+        font-size: 19px;
+        font-weight: 900;
+        line-height: 1.2;
+        text-transform: uppercase;
+      }
       .meta {
         display: inline-flex;
         align-items: center;
@@ -606,7 +646,7 @@
         "Chloe Lim": { id: "user1003", initials: "CL", color: "#8b6ed5" },
         "Daniel Wong": { id: "user1004", initials: "DW", color: "#55b864" },
       };
-      const seed = [
+      const legacySeed = [
         [
           "Aisha Rahman",
           "Ten days to demo. Open items: shrink executable, complete final report, finish slides, rehearse the 20-minute presentation, update Scrum records and collect peer evaluations.",
@@ -654,6 +694,27 @@
           "09:33",
         ],
       ];
+      const seed = [
+        ["Aisha Rahman", "Ten days to demo. Open items: shrink executable, finish the report and slides, rehearse, update Scrum records, and collect peer evaluations.", "09:06"],
+        ["Daniel Wong", "ten days is basically two weeks if you round up", "09:07"],
+        ["Chloe Lim", "that is not how time works hahaha", "09:07", { reply: "ten days is basically two weeks if you round up" }],
+        ["Daniel Wong", "this is fine.gif", "09:08", { media_type: "animation", file: "video_files/this-is-fine.mp4" }],
+        ["Ben Tan", "I can investigate a smaller executable build but no deadline yet. yolo optimisation", "09:09"],
+        ["Daniel Wong", "", "09:10", { media_type: "sticker", file: "stickers/skull.webp", sticker_emoji: "💀" }],
+        ["Chloe Lim", "Model tuning is complete. XGBoost has F1 0.82 and recall 0.86. Everything is tracked in MLflow.", "09:12"],
+        ["Daniel Wong", "The GUI works. I still need input validation and a smaller final build.", "09:15"],
+        ["Aisha Rahman", "Who owns the final Scrum report? It is still unassigned.", "09:18"],
+        ["Chloe Lim", "seen by everyone, claimed by no one 💀", "09:19"],
+        ["Daniel Wong", "report status: one heading and a dream", "09:20", { media_type: "photo", photo: "photos/report-meme.jpg" }],
+        ["Ben Tan", "Fine haha I will take the Scrum report. First draft tomorrow by 8 PM. Aisha can you review it?", "09:21"],
+        ["Aisha Rahman", "Confirmed. I will review it by Thursday noon. Daniel owns the slides and Chloe owns the model explanation.", "09:24"],
+        ["Daniel Wong", "Slides draft Wednesday night. Blocker: I need Chloe's final confusion matrix and feature importance chart.", "09:28"],
+        ["Daniel Wong", "slides can be vibes right", "09:29"],
+        ["Chloe Lim", "vibes + one architecture diagram = distinction", "09:29"],
+        ["Chloe Lim", "I will send both charts today by 4 PM.", "09:30"],
+        ["Aisha Rahman", "Serious final plan: Ben shrink the executable by 18 Sept 6 PM. Daniel finish slides by 20 Sept noon. Chloe owns the model appendix by 19 Sept. I will finish the report and book rehearsal for 22 Sept 4 PM.", "09:33"],
+        ["Ben Tan", "roger 🫡 yolo but with assigned owners", "09:34"],
+      ];
       const state = {
         name: "SafeRoute AI — Group Project",
         type: "private_group",
@@ -667,10 +728,16 @@
         toast = document.querySelector("#toast");
       seed.forEach((item, index) =>
         state.messages.push(
-          makeMessage(index + 1, item[0], item[1], `2026-09-15T${item[2]}:00`),
+          makeMessage(
+            index + 1,
+            item[0],
+            item[1],
+            `2026-09-15T${item[2]}:00`,
+            item[3],
+          ),
         ),
       );
-      function makeMessage(id, from, text, date) {
+      function makeMessage(id, from, text, date, extras = {}) {
         return {
           id,
           type: "message",
@@ -680,6 +747,7 @@
           from_id: people[from].id,
           text,
           text_entities: [{ type: "plain", text }],
+          ...extras,
         };
       }
       function escapeHtml(value) {
@@ -701,6 +769,18 @@
           minute: "2-digit",
         });
       }
+      function mediaMarkup(message) {
+        if (message.media_type === "sticker") {
+          return `<div class="media-preview sticker">${escapeHtml(message.sticker_emoji || "💀")}</div>`;
+        }
+        if (message.media_type === "animation") {
+          return '<div class="media-preview"><span class="gif-label">GIF · THIS IS FINE</span></div>';
+        }
+        if (message.media_type === "photo") {
+          return '<div class="media-preview"><span class="meme-copy">One heading<br>and a dream</span></div>';
+        }
+        return "";
+      }
       function render() {
         messagesEl
           .querySelectorAll(".message-row")
@@ -710,7 +790,10 @@
             person = people[message.from],
             row = document.createElement("div");
           row.className = `message-row${mine ? " mine" : ""}`;
-          row.innerHTML = `${mine ? "" : `<span class="message-avatar" style="background:${person.color}">${person.initials}</span>`}<div class="bubble">${mine ? "" : `<div class="sender">${escapeHtml(message.from)}</div>`}<span class="message-text">${escapeHtml(message.text)}</span><span class="meta">${timeOf(message.date)}${mine ? '<span class="checks">✓✓</span>' : ""}</span></div>`;
+          const reply = message.reply
+            ? `<div class="reply-preview">${escapeHtml(message.reply)}</div>`
+            : "";
+          row.innerHTML = `${mine ? "" : `<span class="message-avatar" style="background:${person.color}">${person.initials}</span>`}<div class="bubble">${mine ? "" : `<div class="sender">${escapeHtml(message.from)}</div>`}${reply}${mediaMarkup(message)}${message.text ? `<span class="message-text">${escapeHtml(message.text)}</span>` : ""}<span class="meta">${timeOf(message.date)}${mine ? '<span class="checks">✓✓</span>' : ""}</span></div>`;
           messagesEl.appendChild(row);
         });
         messagesEl.scrollTop = messagesEl.scrollHeight;

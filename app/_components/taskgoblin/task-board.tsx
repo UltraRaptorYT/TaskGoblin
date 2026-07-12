@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical } from "lucide-react";
+import { GripVertical, KanbanSquare } from "lucide-react";
 import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
@@ -15,6 +15,15 @@ export const TASK_LANES: { id: TaskStatus; title: string; helper: string }[] = [
   { id: "overdue", title: "Overdue", helper: "Deadline trouble" },
   { id: "done", title: "Done", helper: "Completed work" },
 ];
+
+const LANE_ACCENTS: Record<TaskStatus, string> = {
+  backlog: "bg-slate-400",
+  todo: "bg-sky-400",
+  doing: "bg-violet-400",
+  blocked: "bg-rose-400",
+  overdue: "bg-amber-400",
+  done: "bg-emerald-400",
+};
 
 type TaskBoardProps = {
   tasks: TaskItem[];
@@ -58,12 +67,22 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
   }
 
   return (
-    <div>
-      <div className="mb-3">
-        <h2 className="text-lg font-black">Task board</h2>
-        <p className="text-xs text-muted-foreground">Drag cards between columns. On a phone, drag using the grip.</p>
+    <div className="min-w-0 rounded-3xl border border-border/80 bg-card/35 p-3 shadow-sm sm:p-4">
+      <div className="mb-4 flex items-end justify-between gap-4 px-1">
+        <div className="flex items-start gap-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
+            <KanbanSquare className="size-4" />
+          </span>
+          <div>
+            <h2 className="text-lg font-black tracking-[-.025em]">Task board</h2>
+            <p className="text-xs text-muted-foreground">Drag cards between columns. Swipe sideways to see every lane.</p>
+          </div>
+        </div>
+        <span className="hidden rounded-full border bg-background/70 px-3 py-1.5 text-xs font-bold text-muted-foreground sm:block">
+          {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+        </span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid snap-x snap-mandatory grid-flow-col auto-cols-[minmax(220px,1fr)] gap-3 overflow-x-auto pb-2 [scrollbar-color:var(--border)_transparent]">
         {TASK_LANES.map((lane) => {
           const laneTasks = tasks.filter((task) => task.status === lane.id);
           const isTarget = targetLane === lane.id;
@@ -71,7 +90,7 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
             <section
               key={lane.id}
               data-task-lane={lane.id}
-              className={`min-h-40 rounded-2xl border bg-muted/70 p-3 transition ${isTarget ? "border-accent ring-2 ring-accent/60" : "border-border"}`}
+              className={`relative min-h-[360px] snap-start overflow-hidden rounded-2xl border bg-muted/55 p-3 pt-4 transition ${isTarget ? "border-accent ring-2 ring-accent/60" : "border-border/80"}`}
               onDragOver={(event) => { event.preventDefault(); setTargetLane(lane.id); }}
               onDrop={(event) => {
                 event.preventDefault();
@@ -81,9 +100,10 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
                 setTargetLane(undefined);
               }}
             >
+              <span className={`absolute inset-x-0 top-0 h-1 ${LANE_ACCENTS[lane.id]}`} />
               <div className="mb-3 flex items-start justify-between gap-2">
-                <div><h3 className="text-sm font-black">{lane.title}</h3><p className="text-[11px] text-muted-foreground">{lane.helper}</p></div>
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-black">{laneTasks.length}</span>
+                <div><h3 className="text-sm font-black tracking-[-.01em]">{lane.title}</h3><p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">{lane.helper}</p></div>
+                <span className="grid min-w-6 place-items-center rounded-full border bg-background px-1.5 py-0.5 text-[10px] font-black">{laneTasks.length}</span>
               </div>
               <div className="space-y-2">
                 {laneTasks.map((task) => (
@@ -92,7 +112,7 @@ export function TaskBoard({ tasks, selectedTaskId, onSelectTask, onMoveTask }: T
                     draggable
                     role="button"
                     tabIndex={0}
-                    className={`w-full cursor-pointer rounded-xl border bg-card p-3 text-left transition hover:border-ring hover:shadow-sm ${draggedTaskId === task.id ? "opacity-45" : ""} ${selectedTaskId === task.id ? "border-ring ring-2 ring-accent" : "border-border"}`}
+                    className={`w-full cursor-pointer rounded-xl border bg-card p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-ring hover:shadow-md ${draggedTaskId === task.id ? "opacity-45" : ""} ${selectedTaskId === task.id ? "border-ring ring-2 ring-accent" : "border-border"}`}
                     onClick={() => onSelectTask(task)}
                     onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectTask(task); }}
                     onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/task-id", task.id); setDraggedTaskId(task.id); }}

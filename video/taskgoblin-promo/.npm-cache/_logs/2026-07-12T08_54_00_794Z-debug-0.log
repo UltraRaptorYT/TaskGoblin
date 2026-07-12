@@ -1,0 +1,50 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\sohho\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.13.0
+2 info using node@v23.10.0
+3 silly config load:file:C:\Users\sohho\AppData\Roaming\npm\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\sohho\Documents\GitHub\TaskGoblin\video\taskgoblin-promo\.npmrc
+5 silly config load:file:C:\Users\sohho\.npmrc
+6 silly config load:file:C:\Users\sohho\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm exec skills add https://github.com/heygen-com/hyperframes --skill hyperframes --skill hyperframes-animation --skill hyperframes-cli --skill hyperframes-core --skill hyperframes-creative --skill hyperframes-keyframes --skill hyperframes-registry --skill media-use --global --agent claude-code universal --copy --full-depth --yes
+8 verbose argv "exec" "--" "skills" "add" "https://github.com/heygen-com/hyperframes" "--skill" "hyperframes" "--skill" "hyperframes-animation" "--skill" "hyperframes-cli" "--skill" "hyperframes-core" "--skill" "hyperframes-creative" "--skill" "hyperframes-keyframes" "--skill" "hyperframes-registry" "--skill" "media-use" "--global" "--agent" "claude-code" "universal" "--copy" "--full-depth" "--yes"
+9 verbose logfile logs-max:10 dir:C:\Users\sohho\Documents\GitHub\TaskGoblin\video\taskgoblin-promo\.npm-cache\_logs\2026-07-12T08_54_00_794Z-
+10 verbose logfile C:\Users\sohho\Documents\GitHub\TaskGoblin\video\taskgoblin-promo\.npm-cache\_logs\2026-07-12T08_54_00_794Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 http fetch GET 200 https://registry.npmjs.org/skills 91ms (cache miss)
+14 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+15 http fetch GET 200 https://registry.npmjs.org/npm 195ms
+16 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+17 warn exec The following package was not found and will be installed: skills@1.5.16
+18 silly idealTree buildDeps
+19 silly fetch manifest skills@1.5.16
+20 silly packumentCache full:https://registry.npmjs.org/skills cache-miss
+21 http fetch GET 200 https://registry.npmjs.org/skills 52ms (cache miss)
+22 silly packumentCache full:https://registry.npmjs.org/skills set size:undefined disposed:false
+23 silly placeDep ROOT skills@1.5.16 OK for:  want: 1.5.16
+24 silly fetch manifest yaml@^2.8.3
+25 silly packumentCache full:https://registry.npmjs.org/yaml cache-miss
+26 http fetch GET 200 https://registry.npmjs.org/yaml 45ms (cache miss)
+27 silly packumentCache full:https://registry.npmjs.org/yaml set size:undefined disposed:false
+28 silly placeDep ROOT yaml@2.9.0 OK for: skills@1.5.16 want: ^2.8.3
+29 silly reify moves {}
+30 silly audit bulk request { skills: [ '1.5.16' ], yaml: [ '2.9.0' ] }
+31 http cache yaml@https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz 1ms (cache hit)
+32 http cache skills@https://registry.npmjs.org/skills/-/skills-1.5.16.tgz 0ms (cache hit)
+33 silly tarball no local data for yaml@https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz. Extracting by manifest.
+34 silly tarball no local data for skills@https://registry.npmjs.org/skills/-/skills-1.5.16.tgz. Extracting by manifest.
+35 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 189ms
+36 silly audit report {}
+37 http fetch GET 200 https://registry.npmjs.org/skills/-/skills-1.5.16.tgz 200ms (cache miss)
+38 http fetch GET 200 https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz 508ms (cache miss)
+39 verbose cwd C:\Users\sohho\Documents\GitHub\TaskGoblin\video\taskgoblin-promo
+40 verbose os Windows_NT 10.0.26200
+41 verbose node v23.10.0
+42 verbose npm  v11.13.0
+43 notice
+43 notice New minor version of npm available! 11.13.0 -> 11.18.0
+43 notice Changelog: https://github.com/npm/cli/releases/tag/v11.18.0
+43 notice To update run: npm install -g npm@11.18.0
+43 notice  { force: true, [Symbol(proc-log.meta)]: true }
+44 verbose exit 1
+45 verbose code 1

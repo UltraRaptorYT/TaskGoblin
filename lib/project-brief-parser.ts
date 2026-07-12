@@ -1,5 +1,4 @@
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 
 import type { NormalizedTelegramImport } from "@/lib/taskgoblin-types";
 
@@ -22,12 +21,7 @@ export async function readProjectBrief(file: File) {
   let text = "";
 
   if (extension === "pdf") {
-    const parser = new PDFParse({ data: new Uint8Array(buffer) });
-    try {
-      text = (await parser.getText()).text;
-    } finally {
-      await parser.destroy();
-    }
+    text = await extractPdfText(buffer);
   } else if (extension === "docx") {
     text = (await mammoth.extractRawText({ buffer })).value;
   } else {
@@ -47,6 +41,28 @@ export async function readProjectBrief(file: File) {
     text: normalizedText.slice(0, MAX_TEXT_CHARACTERS),
     wasTruncated: normalizedText.length > MAX_TEXT_CHARACTERS,
   };
+}
+
+async function extractPdfText(buffer: Buffer) {
+  // PDF.js reads these browser-style geometry classes while its module loads.
+  // Node does not provide them, so install the native canvas implementations
+  // before dynamically importing pdf-parse. This ordering is required on
+  // serverless runtimes such as Vercel.
+  const canvas = await import("@napi-rs/canvas");
+  const geometryGlobals = globalThis as unknown as Record<string, unknown>;
+
+  geometryGlobals.DOMMatrix ??= canvas.DOMMatrix;
+  geometryGlobals.ImageData ??= canvas.ImageData;
+  geometryGlobals.Path2D ??= canvas.Path2D;
+
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+
+  try {
+    return (await parser.getText()).text;
+  } finally {
+    await parser.destroy();
+  }
 }
 
 export function normalizeProjectBrief(params: {

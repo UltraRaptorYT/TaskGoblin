@@ -1,9 +1,11 @@
 import { AlertTriangle } from "lucide-react";
 
-import type { TaskScanResult } from "@/lib/taskgoblin-types";
+import type { TaskItem, TaskScanResult } from "@/lib/taskgoblin-types";
 import { Metric } from "./shared";
 
 export function ProjectOverview({ scan }: { scan: TaskScanResult }) {
+  const management = getManagementMetrics(scan.tasks);
+
   return (
     <>
       <div className="mb-6 grid gap-4 xl:grid-cols-[auto_1fr] xl:items-end">
@@ -13,10 +15,10 @@ export function ProjectOverview({ scan }: { scan: TaskScanResult }) {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{scan.summary}</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Metric label="Health" value={scan.projectHealth.label} />
-          <Metric label="Score" value={`${scan.projectHealth.score}`} />
-          <Metric label="Unassigned" value={String(scan.tasks.filter((task) => !task.owner).length)} />
-          <Metric label="Blocked" value={String(scan.blockers.length)} />
+          <Metric label="Health" value={management.label} />
+          <Metric label="Score" value={`${management.score}`} />
+          <Metric label="Unassigned" value={String(management.unassigned)} />
+          <Metric label="Blocked" value={String(management.blocked)} />
         </div>
       </div>
       {scan.risks.length > 0 ? (
@@ -33,4 +35,33 @@ export function ProjectOverview({ scan }: { scan: TaskScanResult }) {
       ) : null}
     </>
   );
+}
+
+function getManagementMetrics(tasks: TaskItem[]) {
+  if (tasks.length === 0) {
+    return { score: 0, label: "Not started", unassigned: 0, blocked: 0 };
+  }
+
+  const activeTasks = tasks.filter((task) => task.status !== "done");
+  const unassigned = activeTasks.filter((task) => !task.owner?.trim()).length;
+  const blocked = activeTasks.filter((task) => task.status === "blocked").length;
+  const overdue = activeTasks.filter((task) => task.status === "overdue").length;
+  const missingDeadline = activeTasks.filter((task) => !task.deadline?.trim()).length;
+  const total = tasks.length;
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        100 -
+          (unassigned / total) * 25 -
+          (blocked / total) * 30 -
+          (overdue / total) * 35 -
+          (missingDeadline / total) * 10,
+      ),
+    ),
+  );
+
+  const label = score >= 80 ? "Healthy" : score >= 60 ? "Watch" : "At risk";
+  return { score, label, unassigned, blocked };
 }

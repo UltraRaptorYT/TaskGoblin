@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Send, UserPlus, Users, X } from "lucide-react";
+import { Loader2, Send, UserPlus, Users, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
@@ -17,6 +17,7 @@ type TaskSidebarProps = {
   teamMembers: string[];
   tone: AccountabilityTone;
   reminderMessage: string;
+  isSendingReminder: boolean;
   onUpdateTask: (taskId: string, patch: Partial<TaskItem>) => void;
   onAddTeamMember: (name: string) => void;
   onRemoveTeamMember: (name: string) => void;
@@ -24,7 +25,7 @@ type TaskSidebarProps = {
   onScheduleReminder: (task: TaskItem) => void;
 };
 
-export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, onUpdateTask, onAddTeamMember, onRemoveTeamMember, onToneChange, onScheduleReminder }: TaskSidebarProps) {
+export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, isSendingReminder, onUpdateTask, onAddTeamMember, onRemoveTeamMember, onToneChange, onScheduleReminder }: TaskSidebarProps) {
   const [newMember, setNewMember] = useState("");
   const ownerOptions = [
     ...new Set([
@@ -116,11 +117,16 @@ export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, 
               <button key={nextTone} type="button" className={`flex-1 rounded-lg px-2 py-2 text-xs font-bold capitalize transition ${tone === nextTone ? "bg-[#dfff64] text-[#173d2b]" : "bg-white/10 text-white hover:bg-white/15"}`} onClick={() => onToneChange(nextTone)}>{nextTone}</button>
             ))}
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/8 p-3 text-sm leading-6 text-[#edf2ee]">{reminderMessage}</div>
-          <Button className="w-full" type="button" disabled={!selectedTask} onClick={() => selectedTask && onScheduleReminder(selectedTask)}>
-            <CalendarClock className="size-4" /> Stage Telegram reminder
+          <div className={`rounded-xl border border-white/10 bg-white/8 p-3 text-sm leading-6 ${reminderMessage ? "text-[#edf2ee]" : "text-[#9fb1a3]"}`}>
+            {isSendingReminder
+              ? "The Goblin is consulting the ancient ledger..."
+              : reminderMessage || "A fresh reminder will be written only when you click send."}
+          </div>
+          <Button className="w-full" type="button" disabled={!selectedTask || isSendingReminder} onClick={() => selectedTask && onScheduleReminder(selectedTask)}>
+            {isSendingReminder ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+            {isSendingReminder ? "Generating and sending..." : "Generate & send reminder"}
           </Button>
-          <p className="text-[11px] leading-4 text-[#9fb1a3]">Staging saves the reminder. Live delivery requires a connected Telegram bot.</p>
+          <p className="text-[11px] leading-4 text-[#9fb1a3]">Sent to the personal chat configured in TELEGRAM_DEFAULT_CHAT_ID. Undelivered reminders remain saved for later.</p>
         </CardContent>
       </Card>
     </aside>

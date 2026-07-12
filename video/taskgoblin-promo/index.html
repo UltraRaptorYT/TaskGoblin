@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    @font-face{font-family:"Geist";src:local("Geist");font-weight:500 900;font-style:normal}
+    @font-face{font-family:"Geist Mono";src:local("Geist Mono");font-weight:500 700;font-style:normal}
+    :root{--ink:#07140e;--panel:#173d2b;--lime:#dfff64;--paper:#f4f1e8;--mint:#63d9b1;--ember:#ffb454;--muted:#aebdb2}
+    *{box-sizing:border-box;margin:0;padding:0}html,body{width:1920px;height:1080px;overflow:hidden;background:var(--ink);color:var(--paper);font-family:"Geist",sans-serif}
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;background:radial-gradient(circle at 80% 20%,rgba(223,255,100,.09),transparent 28%),linear-gradient(135deg,#07140e 0%,#0b2016 100%)}
+    #root:before{content:"";position:absolute;inset:-400px;background-image:linear-gradient(rgba(223,255,100,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(223,255,100,.045) 1px,transparent 1px);background-size:86px 86px;transform:perspective(850px) rotateX(58deg) translateY(140px);transform-origin:center;z-index:0}
+    .clip{position:absolute;inset:0;overflow:hidden}.scene{padding:92px 118px;display:flex;align-items:center;justify-content:center}.scene:not(#s1){opacity:0}
+    .kicker{font:700 22px/1 "Geist Mono",monospace;letter-spacing:.15em;text-transform:uppercase;color:var(--lime);margin-bottom:26px}.headline{font-size:104px;line-height:.93;letter-spacing:-.07em;font-weight:900;max-width:1500px}.headline.small{font-size:82px}.accent{color:var(--lime)}
+    .sub{font-size:29px;line-height:1.42;color:#c9d4cc;max-width:940px;margin-top:30px}.mono{font-family:"Geist Mono",monospace}.pill{display:inline-flex;align-items:center;gap:12px;padding:13px 19px;border:1px solid rgba(223,255,100,.3);border-radius:999px;background:rgba(223,255,100,.08);font:600 18px "Geist Mono";color:var(--lime)}
+    .orb{width:12px;height:12px;border-radius:50%;background:var(--lime);box-shadow:0 0 28px var(--lime)}.topline{position:absolute;left:118px;right:118px;top:55px;display:flex;justify-content:space-between;align-items:center;font:600 18px "Geist Mono";color:#89a393}.counter{color:var(--lime)}
+    .ghost{position:absolute;font-size:220px;font-weight:900;letter-spacing:-.09em;color:#596860;white-space:nowrap;left:70px;bottom:18px}
+    .split{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:90px;align-items:center}.stack{position:relative;height:700px}
+    .bubble{position:absolute;min-width:370px;max-width:610px;padding:24px 28px;border-radius:28px 28px 28px 7px;background:#163328;border:1px solid rgba(255,255,255,.08);box-shadow:0 26px 70px rgba(0,0,0,.28);font-size:24px;line-height:1.35}.bubble b{display:block;color:var(--mint);font-size:18px;margin-bottom:7px}.bubble em{font:500 15px "Geist Mono";color:#739180;margin-left:12px}.bubble.mine{border-radius:28px 28px 7px 28px;background:#255b46}.b1{top:20px;left:70px}.b2{top:190px;right:20px}.b3{top:360px;left:10px}.b4{top:520px;right:70px}.danger{color:var(--ember)}
+    .logo-lock{display:flex;align-items:center;gap:30px}.logo{width:176px;height:176px;background:url('assets/taskgoblin-logo.png') center/contain no-repeat;filter:drop-shadow(0 0 52px rgba(223,255,100,.28))}.wordmark{font-size:98px;font-weight:900;letter-spacing:-.07em}.tagline{font-size:39px;color:#c7d2ca;margin-top:18px}
+    .scanner{width:760px;height:650px;border-radius:34px;padding:30px;background:rgba(16,44,31,.86);border:1px solid rgba(223,255,100,.2);box-shadow:0 36px 120px rgba(0,0,0,.45)}.windowbar{display:flex;gap:9px;margin-bottom:26px}.dot{width:12px;height:12px;border-radius:50%;background:#547061}.document{height:515px;border-radius:22px;padding:36px;background:#f4f1e8;color:#173d2b;position:relative;overflow:hidden}.docline{height:12px;border-radius:8px;background:#c9d1c8;margin:17px 0}.docline:nth-child(2n){width:77%}.highlight{background:rgba(223,255,100,.72);padding:5px 3px;font-weight:800}.scanline{position:absolute;left:0;right:0;height:5px;top:25px;background:var(--lime);box-shadow:0 0 34px 13px rgba(223,255,100,.45)}
+    .signals{display:grid;gap:17px}.signal{display:flex;align-items:center;gap:17px;padding:20px 22px;border:1px solid rgba(255,255,255,.1);border-radius:17px;background:rgba(255,255,255,.04);font-size:23px}.signal span:first-child{font:700 16px "Geist Mono";color:var(--lime);width:100px}.signal strong{margin-left:auto;font:700 18px "Geist Mono";color:var(--mint)}
+    .board{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.column{height:590px;border:1px solid rgba(255,255,255,.1);border-radius:25px;background:rgba(244,241,232,.055);padding:24px}.colhead{display:flex;justify-content:space-between;font-size:23px;font-weight:800;margin-bottom:22px}.count{font:700 15px "Geist Mono";background:rgba(223,255,100,.12);color:var(--lime);border-radius:99px;padding:6px 10px}.card{background:var(--paper);color:var(--ink);border-radius:19px;padding:24px;margin:15px 0;box-shadow:0 16px 42px rgba(0,0,0,.22)}.card h3{font-size:25px;line-height:1.15}.card p{font-size:17px;line-height:1.35;color:#506258;margin-top:13px}.cardmeta{display:flex;justify-content:space-between;margin-top:20px;font:700 14px "Geist Mono"}.warning{border:2px solid var(--ember);box-shadow:0 0 32px rgba(255,180,84,.13)}
+    .memberrow{display:flex;gap:13px;margin-top:28px}.avatar{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--lime);color:var(--ink);font-weight:900;border:4px solid #173d2b}.form{border-radius:28px;padding:35px;background:rgba(244,241,232,.07);border:1px solid rgba(255,255,255,.12)}.label{font:700 15px "Geist Mono";color:#8baa98;text-transform:uppercase;letter-spacing:.1em;margin:22px 0 10px}.select{padding:20px 22px;border-radius:15px;background:#f4f1e8;color:#07140e;font-size:21px;font-weight:700;display:flex;justify-content:space-between}.send{margin-top:25px;padding:21px;border-radius:15px;background:var(--lime);color:var(--ink);font-size:22px;font-weight:900;text-align:center;box-shadow:0 0 38px rgba(223,255,100,.22)}
+    .phone{width:610px;border-radius:42px;padding:25px;background:#0d1924;border:8px solid #273643;box-shadow:0 50px 120px rgba(0,0,0,.55)}.phonehead{padding:15px 18px 26px;border-bottom:1px solid #273643;font-size:22px;font-weight:800}.gmessage{margin-top:30px;display:flex;align-items:flex-end;gap:15px}.mini{width:56px;height:56px;border-radius:50%;background:#fff url('assets/taskgoblin-logo.png') center/contain no-repeat}.msg{background:#172737;border-radius:23px 23px 23px 6px;padding:21px 23px;font-size:21px;line-height:1.42;max-width:465px}.msg b{color:var(--lime)}.stamp{display:block;text-align:right;font:500 13px "Geist Mono";color:#7590a5;margin-top:8px}
+    .final{text-align:center;display:flex;flex-direction:column;align-items:center}.final .logo{width:150px;height:150px}.final h1{font-size:112px;line-height:.92;letter-spacing:-.075em;margin-top:26px}.cta{margin-top:42px;display:flex;gap:17px;align-items:center;font:700 22px "Geist Mono";color:var(--lime)}
+  </style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="60" data-width="1920" data-height="1080">
+  <section id="s1" class="clip scene" data-start="0" data-duration="8" data-track-index="1">
+    <div class="topline"><span>TASKGOBLIN / INCIDENT 001</span><span class="counter">00:00</span></div>
+    <div><div class="kicker">Your group chat, 11:47 PM</div><h1 class="headline">Everyone agreed.<br><span class="accent">Nobody owned it.</span></h1><p class="sub">The deadline did not care.</p></div><div class="ghost">GHOST TASK</div>
+  </section>
+  <section id="s2" class="clip scene" data-start="7" data-duration="9" data-track-index="2">
+    <div class="split"><div><div class="kicker">Signal buried in noise</div><h2 class="headline small">Your project is already in the chat.</h2><p class="sub">So are the vague promises, missing owners and dates nobody confirmed.</p></div>
+      <div class="stack"><div class="bubble b1"><b>Amira <em>9:14 PM</em></b>Can someone handle the route model?</div><div class="bubble mine b2"><b>Marcus <em>9:16 PM</em></b>ya can, after class</div><div class="bubble b3"><b>Jia Wei <em>9:41 PM</em></b>When is testing due ah?</div><div class="bubble mine b4 danger"><b>System <em>11:47 PM</em></b>No owner. No date. No mercy.</div></div>
+    </div>
+  </section>
+  <section id="s3" class="clip scene" data-start="15" data-duration="9" data-track-index="3">
+    <div><div class="logo-lock"><div class="logo" role="img" aria-label="TaskGoblin"></div><div><div class="wordmark">TaskGoblin</div><div class="tagline">Turns conversation into accountable work.</div></div></div><div style="margin-top:62px"><span class="pill"><span class="orb"></span> AI PROJECT WRANGLER ONLINE</span></div></div>
+    <div class="ghost">SCAN. PLAN. NUDGE.</div>
+  </section>
+  <section id="s4" class="clip scene" data-start="23" data-duration="12" data-track-index="4">
+    <div class="split"><div><div class="kicker">01 / Upload and scan</div><h2 class="headline small">Drop the brief.<br>Import the chat.</h2><div class="signals" style="margin-top:36px"><div class="signal"><span>FOUND</span>6 tasks<strong>94%</strong></div><div class="signal"><span>LINKED</span>4 owners<strong>88%</strong></div><div class="signal"><span>FLAGGED</span>2 missing tasks<strong class="danger">RISK</strong></div></div></div>
+      <div class="scanner"><div class="windowbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><div class="document"><div class="scanline"></div><h3 class="mono" style="font-size:20px">PAI GROUP PROJECT / BRIEF</h3><div class="docline"></div><div class="docline"></div><p style="font-size:24px;line-height:1.6;margin-top:26px">Teams must <span class="highlight">train and evaluate a safe-route model</span>, document constraints and present findings.</p><div class="docline"></div><div class="docline"></div><div class="docline"></div></div></div>
+    </div>
+  </section>
+  <section id="s5" class="clip scene" data-start="34" data-duration="12" data-track-index="5">
+    <div style="width:100%"><div class="topline"><span>02 / ACCOUNTABLE BOARD</span><span class="counter">SOURCE-BACKED</span></div><div class="board"><div class="column"><div class="colhead">Backlog <span class="count">02</span></div><div class="card warning"><h3>Validate accessibility dataset</h3><p>Missing from chat, inferred from assignment rubric.</p><div class="cardmeta"><span class="danger">NEEDS OWNER</span><span>84%</span></div></div><div class="card"><h3>Define risk constraints</h3><p>Source: project brief, p. 4</p></div></div><div class="column"><div class="colhead">Doing <span class="count">02</span></div><div class="card"><h3>Train baseline model</h3><p>Owner: Marcus · Due Fri 6 PM</p><div class="cardmeta"><span>IN PROGRESS</span><span>92%</span></div></div><div class="card"><h3>Build route visualizer</h3><p>Owner: Jia Wei · Due Sat</p></div></div><div class="column"><div class="colhead">Review <span class="count">01</span></div><div class="card"><h3>Test failure scenarios</h3><p>Evidence attached from 3 chat messages.</p><div class="cardmeta"><span style="color:#188f69">READY</span><span>3 SOURCES</span></div></div></div></div></div>
+  </section>
+  <section id="s6" class="clip scene" data-start="45" data-duration="9" data-track-index="6">
+    <div class="split"><div><div class="kicker">03 / Assign and nudge</div><h2 class="headline small">A reminder they<br><span class="accent">cannot ignore.</span></h2><div class="form" style="margin-top:30px"><div class="label">Owner</div><div class="select"><span>Marcus Tan</span><span>⌄</span></div><div class="label">Goblin tone</div><div class="select"><span>Sinister, but useful</span><span>⌄</span></div><div class="send">Generate & send reminder →</div></div></div>
+      <div class="phone"><div class="phonehead">TaskGoblin &nbsp; <span style="color:#63d9b1">● online</span></div><div class="gmessage"><div class="mini"></div><div class="msg"><b>Marcus, the ledger is getting restless.</b><br><br>Your baseline model is due <b>Friday at 6:00 PM</b>. Confirm the training run by 4:30, then attach your evaluation notes. The goblin will check again before the deadline.<span class="stamp">4:32 PM ✓✓</span></div></div></div>
+    </div>
+  </section>
+  <section id="s7" class="clip scene" data-start="53" data-duration="7" data-track-index="7">
+    <div class="final"><div class="logo" role="img" aria-label="TaskGoblin"></div><div class="kicker" style="margin:26px 0 18px">THE QUEST IS CLEAR</div><h1>Less chat chaos.<br><span class="accent">More quests done.</span></h1><div class="cta"><span class="orb"></span> UPLOAD · SCAN · FINISH</div></div>
+  </section>
+</div>
+<script>
+  window.__timelines=window.__timelines||{};
+  const tl=gsap.timeline({paused:true,defaults:{ease:"power3.out"}});
+  const enter=(id,at)=>{tl.from(id,{opacity:0,x:110,filter:"blur(18px)",duration:.75},at).from(`${id} .kicker, ${id} .headline, ${id} .sub, ${id} .logo-lock, ${id} .pill, ${id} .board, ${id} .split, ${id} .final`,{opacity:0,y:48,stagger:.12,duration:.75},at+.16)};
+  tl.from("#s1 .kicker",{opacity:0,y:30,duration:.6},0).from("#s1 .headline",{opacity:0,y:70,filter:"blur(12px)",duration:.9},.3).from("#s1 .sub",{opacity:0,y:25,duration:.6},1.1);
+  tl.to("#s1",{opacity:0,x:-150,filter:"blur(18px)",duration:.75},7.05);enter("#s2",7);
+  tl.from("#s2 .bubble",{opacity:0,x:80,scale:.92,stagger:.42,duration:.55},7.5).to("#s2",{opacity:0,scale:1.12,filter:"blur(25px)",duration:.8},15.05);enter("#s3",15);
+  tl.from("#s3 .logo",{rotation:-12,scale:.4,duration:.9,ease:"back.out(1.8)"},15.15).to("#s3",{opacity:0,x:-150,filter:"blur(18px)",duration:.75},23.05);enter("#s4",23);
+  tl.from("#s4 .signal",{opacity:0,x:-35,stagger:.35,duration:.5},24).fromTo("#s4 .scanline",{y:0},{y:455,duration:6,ease:"none"},24).to("#s4",{opacity:0,x:-150,filter:"blur(18px)",duration:.75},34.05);enter("#s5",34);
+  tl.from("#s5 .column",{opacity:0,y:55,stagger:.18,duration:.65},34.5).from("#s5 .card",{opacity:0,y:28,stagger:.16,duration:.55},34.85).from("#s5 .warning",{boxShadow:"0 0 0 rgba(255,180,84,0)",duration:.7},36.1).to("#s5",{opacity:0,x:-150,filter:"blur(18px)",duration:.75},45.05);enter("#s6",45);
+  tl.from("#s6 .form",{opacity:0,y:50,duration:.65},45.5).from("#s6 .phone",{opacity:0,x:90,rotation:2,duration:.8},45.7).from("#s6 .msg",{opacity:0,scale:.92,transformOrigin:"bottom left",duration:.7,ease:"back.out(1.4)"},46.65).to("#s6",{opacity:0,scale:.96,filter:"blur(18px)",duration:.75},53.05);enter("#s7",53);
+  tl.from("#s7 .logo",{opacity:0,scale:.2,rotation:-18,duration:.9,ease:"back.out(1.8)"},53.1).from("#s7 h1",{opacity:0,y:65,filter:"blur(15px)",duration:.9},53.45).from("#s7 .cta",{opacity:0,y:25,duration:.65},54.3).to("#s7 .orb",{boxShadow:"0 0 60px #dfff64",duration:.7},55.2);
+  window.__timelines.main=tl;
+</script>
+</body>
+</html>

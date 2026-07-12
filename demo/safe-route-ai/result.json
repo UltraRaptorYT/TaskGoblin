@@ -37,6 +37,30 @@
       "text_entities": []
     },
     {
+      "id": 101,
+      "type": "message",
+      "date": "2026-08-03T09:08:30",
+      "date_unixtime": "1785728910",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "bro that is not phase 1 that is the whole company hahaha",
+      "text_entities": []
+    },
+    {
+      "id": 102,
+      "type": "message",
+      "date": "2026-08-03T09:08:42",
+      "date_unixtime": "1785728922",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "file": "animations/Sticker.webp",
+      "thumbnail": "animations/Sticker_thumb.jpg",
+      "media_type": "sticker",
+      "sticker_emoji": "💀",
+      "text": "",
+      "text_entities": []
+    },
+    {
       "id": 4,
       "type": "message",
       "date": "2026-08-03T09:10:00",
@@ -65,6 +89,36 @@
       "from_id": "user1001",
       "text": "Agreed. First milestone: working data pipeline and dashboard prototype by 21 August. Final demo is 25 September at 2 PM.",
       "text_entities": [{ "type": "bold", "text": "Agreed." }, { "type": "plain", "text": " First milestone: working data pipeline and dashboard prototype by 21 August. Final demo is 25 September at 2 PM." }]
+    },
+    {
+      "id": 103,
+      "type": "message",
+      "date": "2026-08-03T09:16:00",
+      "date_unixtime": "1785729360",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "25 sept sounds very far away. future us can panic 😂",
+      "text_entities": []
+    },
+    {
+      "id": 104,
+      "type": "message",
+      "date": "2026-08-03T09:16:12",
+      "date_unixtime": "1785729372",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "yolo ship first debug during demo",
+      "text_entities": []
+    },
+    {
+      "id": 105,
+      "type": "message",
+      "date": "2026-08-03T09:16:18",
+      "date_unixtime": "1785729378",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "absolutely not 😭 deadlines above are real pls",
+      "text_entities": []
     },
     {
       "id": 7,
@@ -167,6 +221,32 @@
       "text_entities": []
     },
     {
+      "id": 106,
+      "type": "message",
+      "date": "2026-08-07T17:43:00",
+      "date_unixtime": "1786114980",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "file": "video_files/this-is-fine.mp4",
+      "thumbnail": "video_files/this-is-fine.jpg",
+      "media_type": "animation",
+      "mime_type": "video/mp4",
+      "duration_seconds": 3,
+      "text": "this is fine.gif",
+      "text_entities": [{ "type": "plain", "text": "this is fine.gif" }]
+    },
+    {
+      "id": 107,
+      "type": "message",
+      "date": "2026-08-07T17:44:00",
+      "date_unixtime": "1786115040",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "reply_to_message_id": 106,
+      "text": "HAHA very helpful daniel thanks",
+      "text_entities": []
+    },
+    {
       "id": 17,
       "type": "message",
       "date": "2026-08-07T17:48:00",
@@ -257,6 +337,36 @@
       "text_entities": []
     },
     {
+      "id": 108,
+      "type": "message",
+      "date": "2026-08-14T20:10:00",
+      "date_unixtime": "1786747800",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "slides can be vibes right",
+      "text_entities": []
+    },
+    {
+      "id": 109,
+      "type": "message",
+      "date": "2026-08-14T20:10:18",
+      "date_unixtime": "1786747818",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "vibes + one architecture diagram = distinction",
+      "text_entities": []
+    },
+    {
+      "id": 110,
+      "type": "message",
+      "date": "2026-08-14T20:10:29",
+      "date_unixtime": "1786747829",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "haha funny. who is actually doing them?",
+      "text_entities": []
+    },
+    {
       "id": 26,
       "type": "message",
       "date": "2026-08-15T09:17:00",
@@ -304,6 +414,29 @@
       "from": "Aisha Rahman",
       "from_id": "user1001",
       "text": "Milestone review: database and ETL done, EDA done, dashboard mostly done. The location filter is still buggy and the report has only an outline.",
+      "text_entities": []
+    },
+    {
+      "id": 111,
+      "type": "message",
+      "date": "2026-08-21T17:37:00",
+      "date_unixtime": "1787351820",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "photo": "photos/milestone-meme.jpg",
+      "width": 960,
+      "height": 720,
+      "text": "us saying mostly done when the report is one heading and a dream",
+      "text_entities": []
+    },
+    {
+      "id": 112,
+      "type": "message",
+      "date": "2026-08-21T17:37:20",
+      "date_unixtime": "1787351840",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "seen by everyone. claimed by no one 💀",
       "text_entities": []
     },
     {
@@ -404,6 +537,46 @@
       "from": "Aisha Rahman",
       "from_id": "user1001",
       "text": "Ten days to demo. Open items: shrink executable, complete final report, finish slides, rehearse 20-minute presentation, update Scrum records and collect peer evaluations. Please claim anything without an owner today.",
+      "text_entities": []
+    },
+    {
+      "id": 113,
+      "type": "message",
+      "date": "2026-09-15T09:07:00",
+      "date_unixtime": "1789453620",
+      "from": "Daniel Wong",
+      "from_id": "user1004",
+      "text": "ten days is basically two weeks if you round up",
+      "text_entities": []
+    },
+    {
+      "id": 114,
+      "type": "message",
+      "date": "2026-09-15T09:07:12",
+      "date_unixtime": "1789453632",
+      "from": "Chloe Lim",
+      "from_id": "user1003",
+      "text": "that is not how time works hahaha",
+      "text_entities": []
+    },
+    {
+      "id": 115,
+      "type": "message",
+      "date": "2026-09-15T09:08:00",
+      "date_unixtime": "1789453680",
+      "from": "Aisha Rahman",
+      "from_id": "user1001",
+      "text": "serious pls: Ben shrink the executable by 18 Sept 6 PM. Daniel finish slides by 20 Sept noon. Chloe own final model appendix by 19 Sept. I will finish the report and book rehearsal for 22 Sept 4 PM.",
+      "text_entities": []
+    },
+    {
+      "id": 116,
+      "type": "message",
+      "date": "2026-09-15T09:08:15",
+      "date_unixtime": "1789453695",
+      "from": "Ben Tan",
+      "from_id": "user1002",
+      "text": "roger 🫡 yolo but with assigned owners",
       "text_entities": []
     }
   ]

@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import Link from "next/link";
 
 export function BrandMark({ dark = false }: { dark?: boolean }) {
   return (
-    <a href="#" className="flex items-center gap-2.5" aria-label="TaskGoblin home">
+    <Link href="/" className="flex items-center gap-2.5" aria-label="TaskGoblin home">
       <span
         className={`${dark ? "size-10 border border-[#dfff64]/40" : "goblin-shadow-sm size-11 border-2 border-[#173d2b]"} grid place-items-center overflow-hidden rounded-xl bg-[#dfff64]`}
         aria-hidden="true"
@@ -25,7 +26,7 @@ export function BrandMark({ dark = false }: { dark?: boolean }) {
           Goblin
         </span>
       </span>
-    </a>
+    </Link>
   );
 }
 

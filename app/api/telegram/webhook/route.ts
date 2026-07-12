@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { sendTelegramMessage } from "@/lib/telegram-bot";
 
 type TelegramUpdate = {
   update_id?: number;
@@ -32,15 +33,17 @@ export async function POST(request: Request) {
 
   if (chatId && isCommand(text, "start")) {
     const firstName = update.message?.from?.first_name;
-    replySent = await sendTelegramMessage(
+    const delivery = await sendTelegramMessage(
       chatId,
-      `${firstName ? `Hey ${firstName}! ` : ""}I’m TaskGoblin. 🧌\n\nI turn project chats into clear tasks, owners, deadlines, and reminders. Add me to a project group, then upload the Telegram export or project brief in TaskGoblin to build your board.\n\nUse /help to see what I can do.`,
+      `${firstName ? `Hey ${firstName}! ` : ""}I’m TaskGoblin. 🧌\n\nI turn project chats into clear tasks, owners, deadlines, and reminders. Add me to a project group, then upload the Telegram export or project brief in TaskGoblin to build your board.\n\nYour personal reminder chat ID is: ${chatId}\nAdd it as TELEGRAM_DEFAULT_CHAT_ID in Vercel.\n\nUse /help to see what I can do.`,
     );
+    replySent = delivery.sent;
   } else if (chatId && isCommand(text, "help")) {
-    replySent = await sendTelegramMessage(
+    const delivery = await sendTelegramMessage(
       chatId,
       "TaskGoblin commands:\n/start — introduce the bot\n/help — show this guide\n\nLive chat scanning and scheduled Telegram delivery are the next automation steps. You can already import a Telegram result.json or ZIP in the TaskGoblin app.",
     );
+    replySent = delivery.sent;
   }
 
   if (!supabase) {
@@ -67,23 +70,4 @@ export async function POST(request: Request) {
 
 function isCommand(text: string, command: string) {
   return new RegExp(`^/${command}(?:@\\w+)?(?:\\s|$)`, "i").test(text);
-}
-
-async function sendTelegramMessage(chatId: number, text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return false;
-
-  try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${token}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text }),
-      },
-    );
-    return response.ok;
-  } catch {
-    return false;
-  }
 }

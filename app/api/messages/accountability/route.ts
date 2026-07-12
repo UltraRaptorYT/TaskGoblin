@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createAccountabilityMessage } from "@/lib/accountability";
+import { generateAccountabilityMessage } from "@/lib/accountability";
 import type { AccountabilityTone, TaskItem } from "@/lib/taskgoblin-types";
 
 export async function POST(request: Request) {
@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({
-    tone: body.tone ?? "friendly",
-    message: createAccountabilityMessage(body.task, body.tone ?? "friendly"),
-  });
+  const tone = body.tone ?? "friendly";
+  const message = await generateAccountabilityMessage(body.task, tone);
+
+  return NextResponse.json({ tone, message });
 }

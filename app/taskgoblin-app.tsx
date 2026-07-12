@@ -70,9 +70,8 @@ export default function TaskGoblinApp({
     "Upload a project brief or Telegram export to replace this demo scan.",
   );
   const [isImporting, setIsImporting] = useState(false);
-  const [reminderMessage, setReminderMessage] = useState(
-    initialScan.accountabilitySuggestions.friendly,
-  );
+  const [reminderMessage, setReminderMessage] = useState("");
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [teamMembers, setTeamMembers] = useState<string[]>(() => [
     ...new Set(
       initialScan.tasks
@@ -107,7 +106,7 @@ export default function TaskGoblinApp({
               ),
             ]);
             setSelectedTaskId(savedScan.tasks[0]?.id);
-            setReminderMessage(savedScan.accountabilitySuggestions.friendly);
+            setReminderMessage("");
             setImportStatus("Restored your saved demo board from this browser.");
           }
         }
@@ -200,7 +199,7 @@ export default function TaskGoblinApp({
         ]),
       ]);
       setSelectedTaskId(payload.scan.tasks[0]?.id);
-      setReminderMessage(payload.scan.accountabilitySuggestions[tone]);
+      setReminderMessage("");
       setImportStatus(
         `${payload.normalized.chatName}: ${payload.normalized.messageCount} source sections${isTelegramExport ? `, ${payload.normalized.participantCount} participants` : ""}. ${
           payload.persisted ? "Saved to Supabase." : "Running in demo mode."
@@ -244,25 +243,31 @@ export default function TaskGoblinApp({
     setTeamMembers((current) => current.filter((member) => member !== name));
   }
 
-  async function generateReminder(task: TaskItem, nextTone = tone) {
-    const response = await fetch("/api/messages/accountability", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task, tone: nextTone }),
-    });
-    const payload = (await response.json()) as { message?: string };
-    setReminderMessage(payload.message ?? scan.accountabilitySuggestions[nextTone]);
-  }
-
   async function scheduleReminder(task: TaskItem) {
-    const response = await fetch(`/api/tasks/${task.id}/reminders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task, tone }),
-    });
-    const payload = (await response.json()) as { message?: string };
-    setReminderMessage(payload.message ?? reminderMessage);
-    setImportStatus("Reminder staged. Configure the Telegram bot token to send it live.");
+    setIsSendingReminder(true);
+    setReminderMessage("");
+    setImportStatus("Crafting a fresh reminder and sending it to Telegram...");
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/reminders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, tone }),
+      });
+      const payload = (await response.json()) as {
+        message?: string;
+        delivered?: boolean;
+        deliveryError?: string;
+        persisted?: boolean;
+      };
+      setReminderMessage(payload.message ?? "The Goblin returned without a message.");
+      setImportStatus(
+        payload.delivered
+          ? "Fresh reminder generated and sent to your personal Telegram chat."
+          : `Reminder generated but not delivered. ${payload.deliveryError ?? "Check the Telegram configuration."}`,
+      );
+    } finally {
+      setIsSendingReminder(false);
+    }
   }
 
   async function signInWithOAuth(provider: Provider) {
@@ -313,7 +318,7 @@ export default function TaskGoblinApp({
             onMoveTask={(taskId, status) => updateTask(taskId, { status })}
             onSelectTask={(task) => {
               setSelectedTaskId(task.id);
-              void generateReminder(task);
+              setReminderMessage("");
             }}
           />
           <TaskSidebar
@@ -321,12 +326,13 @@ export default function TaskGoblinApp({
             teamMembers={teamMembers}
             tone={tone}
             reminderMessage={reminderMessage}
+            isSendingReminder={isSendingReminder}
             onUpdateTask={updateTask}
             onAddTeamMember={addTeamMember}
             onRemoveTeamMember={removeTeamMember}
             onToneChange={(nextTone) => {
               setTone(nextTone);
-              if (selectedTask) void generateReminder(selectedTask, nextTone);
+              setReminderMessage("");
             }}
             onScheduleReminder={(task) => void scheduleReminder(task)}
           />

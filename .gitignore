@@ -41,3 +41,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+build/
+env/
+dist/
+*.egg-info/
+*.pyc
+__pycache__
+.coverage
+coverage.xml
+.tox/
+.cache/
