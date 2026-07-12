@@ -14,7 +14,7 @@ import {
   WorkspaceHeader,
 } from "@/app/_components/taskgoblin/workspace-shell";
 import { createMockScanResult } from "@/lib/mock-scan";
-import { demoProjectScanKey, readDemoProjects, writeDemoProjects } from "@/lib/demo-projects";
+import { demoProjectMembersKey, demoProjectScanKey, readDemoProjects, writeDemoProjects } from "@/lib/demo-projects";
 import { getSupabasePublic } from "@/lib/supabase-public";
 import type {
   AccountabilityTone,
@@ -73,6 +73,13 @@ export default function TaskGoblinApp({
   const [reminderMessage, setReminderMessage] = useState(
     initialScan.accountabilitySuggestions.friendly,
   );
+  const [teamMembers, setTeamMembers] = useState<string[]>(() => [
+    ...new Set(
+      initialScan.tasks
+        .map((task) => task.owner)
+        .filter((owner): owner is string => Boolean(owner)),
+    ),
+  ]);
   const supabase = useMemo(() => getSupabasePublic(), []);
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(() => !supabase);
@@ -92,10 +99,22 @@ export default function TaskGoblinApp({
           const savedScan = JSON.parse(stored) as TaskScanResult;
           if (Array.isArray(savedScan.tasks)) {
             setScan(savedScan);
+            setTeamMembers([
+              ...new Set(
+                savedScan.tasks
+                  .map((task) => task.owner)
+                  .filter((owner): owner is string => Boolean(owner)),
+              ),
+            ]);
             setSelectedTaskId(savedScan.tasks[0]?.id);
             setReminderMessage(savedScan.accountabilitySuggestions.friendly);
             setImportStatus("Restored your saved demo board from this browser.");
           }
+        }
+        const storedMembers = window.localStorage.getItem(demoProjectMembersKey(demoProjectId));
+        if (storedMembers) {
+          const savedMembers = JSON.parse(storedMembers) as string[];
+          if (Array.isArray(savedMembers)) setTeamMembers(savedMembers);
         }
       } catch {
         window.localStorage.removeItem(demoProjectScanKey(demoProjectId));
@@ -111,13 +130,14 @@ export default function TaskGoblinApp({
     if (!initialDemoMode || !demoProjectId || !demoStorageReady) return;
     try {
       window.localStorage.setItem(demoProjectScanKey(demoProjectId), JSON.stringify(scan));
+      window.localStorage.setItem(demoProjectMembersKey(demoProjectId), JSON.stringify(teamMembers));
       writeDemoProjects(readDemoProjects().map((project) => project.id === demoProjectId ? {
         ...project,
         taskCount: scan.tasks.length,
         updatedAt: new Date().toISOString(),
       } : project));
     } catch {}
-  }, [demoProjectId, demoStorageReady, initialDemoMode, scan]);
+  }, [demoProjectId, demoStorageReady, initialDemoMode, scan, teamMembers]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -171,6 +191,14 @@ export default function TaskGoblinApp({
       if (!response.ok) throw new Error(payload.error ?? "Telegram import failed.");
 
       setScan(payload.scan);
+      setTeamMembers((current) => [
+        ...new Set([
+          ...current,
+          ...payload.scan.tasks
+            .map((task) => task.owner)
+            .filter((owner): owner is string => Boolean(owner)),
+        ]),
+      ]);
       setSelectedTaskId(payload.scan.tasks[0]?.id);
       setReminderMessage(payload.scan.accountabilitySuggestions[tone]);
       setImportStatus(
@@ -200,6 +228,20 @@ export default function TaskGoblinApp({
         body: JSON.stringify(patch),
       });
     }
+  }
+
+  function addTeamMember(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setTeamMembers((current) =>
+      current.some((member) => member.toLowerCase() === trimmed.toLowerCase())
+        ? current
+        : [...current, trimmed],
+    );
+  }
+
+  function removeTeamMember(name: string) {
+    setTeamMembers((current) => current.filter((member) => member !== name));
   }
 
   async function generateReminder(task: TaskItem, nextTone = tone) {
@@ -276,9 +318,12 @@ export default function TaskGoblinApp({
           />
           <TaskSidebar
             selectedTask={selectedTask}
+            teamMembers={teamMembers}
             tone={tone}
             reminderMessage={reminderMessage}
             onUpdateTask={updateTask}
+            onAddTeamMember={addTeamMember}
+            onRemoveTeamMember={removeTeamMember}
             onToneChange={(nextTone) => {
               setTone(nextTone);
               if (selectedTask) void generateReminder(selectedTask, nextTone);

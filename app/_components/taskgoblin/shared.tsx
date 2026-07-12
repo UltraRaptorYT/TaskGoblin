@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import Image from "next/image";
 
 export function BrandMark({ dark = false }: { dark?: boolean }) {
@@ -32,7 +33,14 @@ export function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-muted p-3">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-black text-foreground">{value}</p>
+      <p
+        className={cn(
+          "mt-1 font-black text-foreground",
+          label === "Health" ? "text-sm" : "text-xl ",
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }

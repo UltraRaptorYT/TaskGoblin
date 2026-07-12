@@ -13,6 +13,10 @@ export function demoProjectScanKey(projectId: string) {
   return `taskgoblin.demo.project.${projectId}.scan.v1`;
 }
 
+export function demoProjectMembersKey(projectId: string) {
+  return `taskgoblin.demo.project.${projectId}.members.v1`;
+}
+
 export function readDemoProjects(): DemoProjectSummary[] {
   try {
     const value = window.localStorage.getItem(DEMO_PROJECTS_KEY);

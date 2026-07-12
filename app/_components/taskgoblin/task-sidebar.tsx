@@ -1,4 +1,8 @@
-import { CalendarClock, Send } from "lucide-react";
+"use client";
+
+import { CalendarClock, Send, UserPlus, Users, X } from "lucide-react";
+import type { FormEvent } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,16 +14,57 @@ const TONES: AccountabilityTone[] = ["professional", "friendly", "goblin"];
 
 type TaskSidebarProps = {
   selectedTask?: TaskItem;
+  teamMembers: string[];
   tone: AccountabilityTone;
   reminderMessage: string;
   onUpdateTask: (taskId: string, patch: Partial<TaskItem>) => void;
+  onAddTeamMember: (name: string) => void;
+  onRemoveTeamMember: (name: string) => void;
   onToneChange: (tone: AccountabilityTone) => void;
   onScheduleReminder: (task: TaskItem) => void;
 };
 
-export function TaskSidebar({ selectedTask, tone, reminderMessage, onUpdateTask, onToneChange, onScheduleReminder }: TaskSidebarProps) {
+export function TaskSidebar({ selectedTask, teamMembers, tone, reminderMessage, onUpdateTask, onAddTeamMember, onRemoveTeamMember, onToneChange, onScheduleReminder }: TaskSidebarProps) {
+  const [newMember, setNewMember] = useState("");
+  const ownerOptions = [
+    ...new Set([
+      ...teamMembers,
+      ...(selectedTask?.owner ? [selectedTask.owner] : []),
+    ]),
+  ];
+
+  function submitMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newMember.trim()) return;
+    onAddTeamMember(newMember);
+    setNewMember("");
+  }
+
   return (
     <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+      <details className="group rounded-2xl border border-border bg-card shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+          <span className="flex items-center gap-2 text-sm font-black"><Users className="size-4 text-primary" /> Team members</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{teamMembers.length}</span>
+        </summary>
+        <div className="border-t border-border p-4">
+          <form className="flex gap-2" onSubmit={submitMember}>
+            <input className="h-10 min-w-0 flex-1 rounded-xl border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={newMember} placeholder="Add teammate" aria-label="Team member name" onChange={(event) => setNewMember(event.target.value)} />
+            <Button type="submit" aria-label="Add team member"><UserPlus className="size-4" /> Add</Button>
+          </form>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {teamMembers.map((member) => (
+              <span key={member} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold">
+                <span className="grid size-5 place-items-center rounded-full bg-primary text-[9px] font-black text-primary-foreground">{member.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span>
+                {member}
+                <button type="button" className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground" aria-label={`Remove ${member}`} onClick={() => onRemoveTeamMember(member)}><X className="size-3" /></button>
+              </span>
+            ))}
+            {teamMembers.length === 0 ? <p className="text-xs text-muted-foreground">Add teammates, then assign tasks from the owner dropdown.</p> : null}
+          </div>
+        </div>
+      </details>
+
       {selectedTask ? (
         <Card className="bg-card">
           <CardHeader className="border-b border-border pb-4">
@@ -34,7 +79,10 @@ export function TaskSidebar({ selectedTask, tone, reminderMessage, onUpdateTask,
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs font-bold text-muted-foreground">
                 Owner
-                <input className="mt-1.5 h-10 w-full rounded-xl border bg-background px-3 text-sm font-normal text-foreground outline-none focus:ring-2 focus:ring-ring" value={selectedTask.owner ?? ""} placeholder="Assign owner" onChange={(event) => onUpdateTask(selectedTask.id, { owner: event.target.value || null })} />
+                <select className="mt-1.5 h-10 w-full rounded-xl border bg-background px-3 text-sm font-normal text-foreground outline-none focus:ring-2 focus:ring-ring" value={selectedTask.owner ?? ""} onChange={(event) => onUpdateTask(selectedTask.id, { owner: event.target.value || null })}>
+                  <option value="">Unassigned</option>
+                  {ownerOptions.map((member) => <option key={member} value={member}>{member}</option>)}
+                </select>
               </label>
               <label className="text-xs font-bold text-muted-foreground">
                 Status

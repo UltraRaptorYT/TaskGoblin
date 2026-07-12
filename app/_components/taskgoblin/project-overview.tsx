@@ -6,7 +6,7 @@ import { Metric } from "./shared";
 export function ProjectOverview({ scan }: { scan: TaskScanResult }) {
   return (
     <>
-      <div className="mb-6 grid gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
+      <div className="mb-6 grid gap-4 xl:grid-cols-[auto_1fr] xl:items-end">
         <div>
           <p className="text-xs font-black uppercase tracking-[.14em] text-[#66852c]">Project overview</p>
           <h2 className="mt-2 text-2xl font-black tracking-[-.035em] sm:text-3xl">The Goblin&apos;s read</h2>
