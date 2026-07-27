@@ -39,6 +39,13 @@
       "status": "doing",
       "ownerTelegramUserRecordId": "user-alice",
       "dueLabel": null
+    },
+    {
+      "id": "task-backend",
+      "title": "Work on the backend",
+      "status": "backlog",
+      "ownerTelegramUserRecordId": "user-alice",
+      "dueLabel": null
     }
   ],
   "cases": [
@@ -55,6 +62,59 @@
       "text": "@bob can you write the release notes",
       "senderUsername": "alice",
       "expectedEventType": "explicit_task_assignment"
+    },
+    {
+      "id": "assignment-contextual-acceptance",
+      "category": "contextual_assignments",
+      "text": "Sure",
+      "senderUsername": "alice",
+      "replyToMessageId": 9000,
+      "recentMessages": [
+        {
+          "telegramMessageId": 8997,
+          "sentAt": "2026-07-27T03:58:00.000Z",
+          "senderUsername": "bob",
+          "senderDisplayName": "Bob",
+          "text": "shall it be called TaskGoblin?",
+          "replyToTelegramMessageId": null
+        },
+        {
+          "telegramMessageId": 8998,
+          "sentAt": "2026-07-27T03:58:10.000Z",
+          "senderUsername": "bob",
+          "senderDisplayName": "Bob",
+          "text": "the project",
+          "replyToTelegramMessageId": null
+        },
+        {
+          "telegramMessageId": 9000,
+          "sentAt": "2026-07-27T03:59:00.000Z",
+          "senderUsername": "bob",
+          "senderDisplayName": "Bob",
+          "text": "then u wanna do the website for it?",
+          "replyToTelegramMessageId": null
+        }
+      ],
+      "expectedEventType": "explicit_task_assignment",
+      "expectedOwnerTelegramUserRecordId": "user-alice"
+    },
+    {
+      "id": "assignment-contextual-casual-reply",
+      "category": "contextual_assignments",
+      "text": "Sure",
+      "senderUsername": "alice",
+      "replyToMessageId": 9000,
+      "recentMessages": [
+        {
+          "telegramMessageId": 9000,
+          "sentAt": "2026-07-27T03:59:00.000Z",
+          "senderUsername": "bob",
+          "senderDisplayName": "Bob",
+          "text": "Wanna get lunch?",
+          "replyToTelegramMessageId": null
+        }
+      ],
+      "expectedEventType": "none"
     },
     {
       "id": "vague-1",
@@ -197,6 +257,22 @@
       "expectedEventType": "deadline_update",
       "expectedMatchedTaskId": "task-webhook",
       "expectResolvedDeadline": true
+    },
+    {
+      "id": "deadline-owner-commitment-shorthand",
+      "category": "deadline_updates",
+      "text": "let me do my backend task by tmr morning",
+      "senderUsername": "alice",
+      "expectedEventType": "deadline_update",
+      "expectedMatchedTaskId": "task-backend",
+      "expectedDueAt": "2026-07-28T01:00:00.000Z"
+    },
+    {
+      "id": "deadline-owner-commitment-mismatch",
+      "category": "deadline_updates",
+      "text": "let me do the backend task by tmr morning",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
     },
     {
       "id": "blocker-task",

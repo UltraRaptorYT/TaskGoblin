@@ -6,6 +6,7 @@ const summarySchema = z.string().min(1).max(240);
 const taskIdSchema = z.string().min(1).max(100);
 const usernameSchema = z.string().min(1).max(64);
 const deadlineTextSchema = z.string().min(1).max(100);
+const telegramMessageIdSchema = z.number().int().positive();
 
 export const noProjectEventSchema = z.strictObject({
   eventType: z.literal("none"),
@@ -26,6 +27,7 @@ export const explicitTaskAssignmentEventSchema = z.strictObject({
   eventType: z.literal("explicit_task_assignment"),
   title: summarySchema,
   ownerUsername: usernameSchema,
+  evidenceTelegramMessageId: telegramMessageIdSchema,
   deadlineText: deadlineTextSchema.nullable(),
   confidence: confidenceSchema,
   rationale: rationaleSchema,

@@ -23,8 +23,12 @@ type FixtureCase = {
   expectedEventType: ProjectEventType | "none";
   expectedDuplicate?: boolean;
   expectedMatchedTaskId?: string;
+  expectedOwnerTelegramUserRecordId?: string;
+  expectedDueAt?: string;
   expectResolvedDeadline?: boolean;
   recentCandidates?: ProjectDetectionContext["recentCandidates"];
+  recentMessages?: ProjectDetectionContext["recentMessages"];
+  replyToMessageId?: number | null;
 };
 
 const baseContext: ProjectDetectionContext = {
@@ -33,6 +37,7 @@ const baseContext: ProjectDetectionContext = {
   members: fixtures.members,
   tasks: fixtures.tasks as ProjectDetectionContext["tasks"],
   recentCandidates: [],
+  recentMessages: [],
 };
 
 function messageFor(testCase: FixtureCase): TelegramInboundMessage {
@@ -53,7 +58,7 @@ function messageFor(testCase: FixtureCase): TelegramInboundMessage {
       username: testCase.senderUsername,
       languageCode: "en",
     },
-    replyToMessageId: null,
+    replyToMessageId: testCase.replyToMessageId ?? null,
     messageThreadId: null,
     raw: {},
   };
@@ -91,6 +96,7 @@ describe("project event post-validation", () => {
         eventType: "explicit_task_assignment",
         title: "Prepare the budget",
         ownerUsername: "@alice",
+        evidenceTelegramMessageId: 9001,
         deadlineText: null,
         confidence: 0.92,
         rationale: "Explicit assignment.",
@@ -109,6 +115,7 @@ describe("project event post-validation", () => {
           eventType: "explicit_task_assignment",
           title: "Prepare the budget",
           ownerUsername: "charlie",
+          evidenceTelegramMessageId: 9001,
           deadlineText: null,
           confidence: 0.92,
           rationale: "Explicit assignment.",
@@ -171,6 +178,13 @@ describe("project event post-validation", () => {
         "Asia/Singapore",
       ),
     ).toBe("2026-08-04T15:59:00.000Z");
+    expect(
+      resolveDeadline(
+        "by tmr morning",
+        "2026-07-27T15:13:00.000Z",
+        "Asia/Singapore",
+      ),
+    ).toBe("2026-07-28T01:00:00.000Z");
   });
 
   it("uses deterministic mock mode without a provider key", async () => {
@@ -200,6 +214,7 @@ describe("held-out deterministic event fixtures", () => {
       const context = {
         ...baseContext,
         recentCandidates: testCase.recentCandidates ?? [],
+        recentMessages: testCase.recentMessages ?? [],
       };
       const output = detectMockProjectEvent(messageFor(testCase), context);
       const event = validateProjectEvent(output, messageFor(testCase), context);
@@ -218,6 +233,11 @@ describe("held-out deterministic event fixtures", () => {
           testCase.expectedMatchedTaskId,
         );
       }
+      if (testCase.expectedOwnerTelegramUserRecordId) {
+        expect(event?.ownerTelegramUserRecordId, testCase.id).toBe(
+          testCase.expectedOwnerTelegramUserRecordId,
+        );
+      }
       if (testCase.expectedDuplicate) {
         expect(
           Boolean(event?.duplicateOfTaskId || event?.duplicateOfCandidateId),
@@ -226,6 +246,9 @@ describe("held-out deterministic event fixtures", () => {
       }
       if (testCase.expectResolvedDeadline) {
         expect(event?.dueAt, testCase.id).toBeTruthy();
+      }
+      if (testCase.expectedDueAt) {
+        expect(event?.dueAt, testCase.id).toBe(testCase.expectedDueAt);
       }
     }
 

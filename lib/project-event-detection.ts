@@ -8,7 +8,7 @@ import {
 } from "@/lib/project-event-schemas";
 import type { TelegramInboundMessage } from "@/lib/taskgoblin-types";
 
-export const PROJECT_EVENT_PROMPT_VERSION = "telegram-event-v1";
+export const PROJECT_EVENT_PROMPT_VERSION = "telegram-event-v3";
 export const DEFAULT_PROJECT_EVENT_MODEL = "gpt-5.6-sol";
 export const MIN_PROJECT_EVENT_CONFIDENCE = 0.7;
 
@@ -32,12 +32,22 @@ export type RecentProjectEventCandidate = {
   summary: string;
 };
 
+export type RecentTelegramMessageContext = {
+  telegramMessageId: number;
+  sentAt: string | null;
+  senderUsername: string | null;
+  senderDisplayName: string;
+  text: string;
+  replyToTelegramMessageId: number | null;
+};
+
 export type ProjectDetectionContext = {
   projectId: string;
   timezone: string;
   members: KnownProjectMember[];
   tasks: KnownProjectTask[];
   recentCandidates: RecentProjectEventCandidate[];
+  recentMessages: RecentTelegramMessageContext[];
 };
 
 export type ValidatedProjectEvent = {
@@ -65,7 +75,9 @@ export type ProjectEventDetectionResult = {
 type DetectionMode = "openai" | "mock";
 
 const SYSTEM_INSTRUCTIONS = `
-You detect at most one project event in one Telegram group message.
+You detect at most one project event triggered by the current Telegram group
+message. recentMessages are a small chronological context window, not separate
+messages to scan for old events.
 
 Return "none" for casual chat, jokes, vague suggestions, irrelevant content, or
 anything too ambiguous to review safely. Never invent an owner, deadline, task
@@ -79,10 +91,24 @@ Event boundaries:
 - task_proposal includes a first-person commitment such as "I will..." and a
   concrete unassigned project need such as "We need to document rollback
   steps." It is not an assignment merely because the speaker is a known member.
-- explicit_task_assignment requires one person to directly request or instruct
-  another explicitly @mentioned known member to do work.
+- explicit_task_assignment is allowed in exactly two cases:
+  1. The current message directly requests or instructs an explicitly
+     @mentioned known member to do concrete work.
+  2. The current message is an explicit acceptance ("sure", "yes", "okay",
+     "I'll do it", or equivalent) by a known member replying directly to a
+     concrete work request in recentMessages. In this case the accepting sender
+     is the owner.
+  Set evidenceTelegramMessageId to the current message id for case 1, or to the
+  replied-to request message id for case 2. Never infer an assignment merely
+  from nearby names, participation, or a non-committal response. Write the title
+  as a concise action grounded in the evidence message and nearby project
+  context.
 - blocker may describe a project-level impediment without a matched task.
 - progress, completion, and deadline updates require a supported task match.
+- deadline_update also includes a task owner committing to complete their
+  existing matched task by an explicit deadline, even without words such as
+  "deadline", "move", or "reschedule". Telegram shorthand such as "tmr
+  morning" is valid. Copy deadlineText verbatim from the message.
 - decision requires explicit decision language, not a preference or idea.
 
 Relative deadlines such as "tomorrow" and "next Tuesday" are valid when they
@@ -203,11 +229,43 @@ export function validateProjectEvent(
   if (output.eventType === "explicit_task_assignment" && !owner) return null;
   if (ownerUsername && !owner) return null;
 
+  const assignmentEvidence =
+    output.eventType === "explicit_task_assignment"
+      ? resolveAssignmentEvidence(
+          output.evidenceTelegramMessageId,
+          message,
+          context,
+        )
+      : null;
+  if (
+    output.eventType === "explicit_task_assignment" &&
+    (!assignmentEvidence ||
+      !isValidAssignmentEvidence(
+        output.title,
+        owner!,
+        message,
+        assignmentEvidence,
+      ))
+  ) {
+    return null;
+  }
+
   const deadlineText =
     "deadlineText" in output
-      ? validateDeadlineText(output.deadlineText, message.text)
+      ? validateDeadlineText(
+          output.deadlineText,
+          assignmentEvidence?.text ?? message.text,
+        )
       : null;
   if (output.eventType === "deadline_update" && !deadlineText) return null;
+  if (
+    output.eventType === "deadline_update" &&
+    isDeadlineCommitment(message.text) &&
+    matchedTaskId &&
+    !isTaskOwnedBySender(matchedTaskId, message, context)
+  ) {
+    return null;
+  }
   const dueAt = deadlineText
     ? resolveDeadline(deadlineText, message.sentAt, context.timezone)
     : null;
@@ -255,7 +313,7 @@ export function detectMockProjectEvent(
     message.updateType !== "message" ||
     !message.actor ||
     message.actor.isBot ||
-    text.length < 5
+    !text
   ) {
     return none("Unsupported or non-human message.");
   }
@@ -268,6 +326,16 @@ export function detectMockProjectEvent(
     )
   ) {
     return none("The suggestion is too tentative or ambiguous.");
+  }
+
+  const contextualAssignment = detectContextualAssignment(
+    message,
+    context,
+    text,
+  );
+  if (contextualAssignment) return contextualAssignment;
+  if (text.length < 5) {
+    return none("No sufficiently explicit supported project event.");
   }
 
   const matchedTask = findBestTaskMatch(text, context.tasks);
@@ -300,6 +368,21 @@ export function detectMockProjectEvent(
       deadlineText,
       confidence: 0.88,
       rationale: "Explicit deadline change matched an existing task.",
+    };
+  }
+
+  if (deadlineText && matchedTask && isDeadlineCommitment(text)) {
+    if (!isTaskOwnedBySender(matchedTask.id, message, context)) {
+      return none("The deadline commitment does not belong to the sender's task.");
+    }
+    return {
+      eventType: "deadline_update",
+      summary: text.slice(0, 240),
+      matchedTaskId: matchedTask.id,
+      deadlineText,
+      confidence: 0.9,
+      rationale:
+        "The task owner committed to complete an existing task by an explicit deadline.",
     };
   }
 
@@ -362,9 +445,26 @@ export function detectMockProjectEvent(
       eventType: "explicit_task_assignment",
       title: text.slice(0, 240),
       ownerUsername: mentionedMember.username!,
+      evidenceTelegramMessageId: message.messageId,
       deadlineText,
       confidence: 0.91,
       rationale: "Explicit request names a known Telegram chat member.",
+    };
+  }
+
+  if (/\blet me\b/i.test(lower)) {
+    const sender = context.members.find(
+      (member) =>
+        normalizeUsername(member.username) ===
+        normalizeUsername(message.actor?.username ?? null),
+    );
+    return {
+      eventType: "task_proposal",
+      title: text.slice(0, 240),
+      ownerUsername: sender?.username ?? null,
+      deadlineText,
+      confidence: 0.82,
+      rationale: "The message contains an explicit first-person commitment.",
     };
   }
 
@@ -414,7 +514,7 @@ export function resolveDeadline(
       month: Number(iso[2]),
       day: Number(iso[3]),
     };
-  } else if (/\btomorrow\b/.test(lower)) {
+  } else if (/\b(?:tomorrow|tmr)\b/.test(lower)) {
     target = addCalendarDays(target, 1);
   } else if (!/\btoday\b/.test(lower)) {
     const weekday = weekdayIndex(lower);
@@ -428,7 +528,10 @@ export function resolveDeadline(
   }
 
   if (!validCalendarDate(target)) return null;
-  return localEndOfDayToUtc(target, safeTimezone).toISOString();
+  if (/\bmorning\b/.test(lower)) {
+    return localTimeToUtc(target, safeTimezone, 9, 0).toISOString();
+  }
+  return localTimeToUtc(target, safeTimezone, 23, 59).toISOString();
 }
 
 function buildModelInput(
@@ -441,7 +544,16 @@ function buildModelInput(
       sentAt: message.sentAt,
       senderUsername: message.actor?.username ?? null,
       text: message.text,
+      replyToTelegramMessageId: message.replyToMessageId,
     },
+    recentMessages: context.recentMessages.map((recent) => ({
+      telegramMessageId: recent.telegramMessageId,
+      sentAt: recent.sentAt,
+      senderUsername: recent.senderUsername,
+      senderDisplayName: recent.senderDisplayName,
+      text: recent.text,
+      replyToTelegramMessageId: recent.replyToTelegramMessageId,
+    })),
     projectTimezone: context.timezone,
     knownMembers: context.members.map((member) => ({
       username: member.username,
@@ -474,6 +586,10 @@ function eventPayload(
       title: event.title,
       ownerUsername,
       deadlineText,
+      evidenceTelegramMessageId:
+        event.eventType === "explicit_task_assignment"
+          ? event.evidenceTelegramMessageId
+          : null,
     };
   }
   if (event.eventType === "deadline_update") {
@@ -516,6 +632,114 @@ function resolveKnownMember(
   );
 }
 
+function resolveAssignmentEvidence(
+  evidenceTelegramMessageId: number,
+  message: TelegramInboundMessage,
+  context: ProjectDetectionContext,
+): RecentTelegramMessageContext | null {
+  if (evidenceTelegramMessageId === message.messageId) {
+    return {
+      telegramMessageId: message.messageId,
+      sentAt: message.sentAt,
+      senderUsername: message.actor?.username ?? null,
+      senderDisplayName:
+        [message.actor?.firstName, message.actor?.lastName]
+          .filter(Boolean)
+          .join(" ") || "Unknown",
+      text: message.text,
+      replyToTelegramMessageId: message.replyToMessageId,
+    };
+  }
+  return (
+    context.recentMessages.find(
+      (recent) => recent.telegramMessageId === evidenceTelegramMessageId,
+    ) ?? null
+  );
+}
+
+function isValidAssignmentEvidence(
+  title: string,
+  owner: KnownProjectMember,
+  message: TelegramInboundMessage,
+  evidence: RecentTelegramMessageContext,
+) {
+  if (evidence.telegramMessageId === message.messageId) {
+    const ownerMention = owner.username
+      ? new RegExp(
+          `@${escapeRegex(owner.username.replace(/^@/, ""))}\\b`,
+          "i",
+        ).test(message.text)
+      : false;
+    return ownerMention && containsAssignmentRequest(message.text);
+  }
+
+  const senderIsOwner =
+    normalizeUsername(message.actor?.username ?? null) ===
+    normalizeUsername(owner.username);
+  return (
+    senderIsOwner &&
+    message.replyToMessageId === evidence.telegramMessageId &&
+    isExplicitAcceptance(message.text) &&
+    containsAssignmentRequest(evidence.text) &&
+    similarity(title, evidence.text) >= 0.25
+  );
+}
+
+function detectContextualAssignment(
+  message: TelegramInboundMessage,
+  context: ProjectDetectionContext,
+  text: string,
+): ModelProjectEvent | null {
+  if (!message.replyToMessageId || !isExplicitAcceptance(text)) return null;
+  const evidence = context.recentMessages.find(
+    (recent) => recent.telegramMessageId === message.replyToMessageId,
+  );
+  if (!evidence || !containsAssignmentRequest(evidence.text)) return null;
+  const owner = context.members.find(
+    (member) =>
+      normalizeUsername(member.username) ===
+      normalizeUsername(message.actor?.username ?? null),
+  );
+  if (!owner?.username) return null;
+  return {
+    eventType: "explicit_task_assignment",
+    title: contextualTaskTitle(evidence.text),
+    ownerUsername: owner.username,
+    evidenceTelegramMessageId: evidence.telegramMessageId,
+    deadlineText: extractDeadlineText(evidence.text),
+    confidence: 0.9,
+    rationale:
+      "A known member explicitly accepted a concrete request in the replied-to message.",
+  };
+}
+
+function containsAssignmentRequest(text: string) {
+  return /\b(?:please|can\s+you|could\s+you|would\s+you|will\s+you|do\s+you\s+want\s+to|you\s+wanna|u\s+wanna|need\s+you\s+to|you\s+need\s+to|you\s+must)\b/i.test(
+    text,
+  );
+}
+
+function isExplicitAcceptance(text: string) {
+  return /^(?:sure|yes|yep|yeah|ok(?:ay)?|sounds good|i(?:'|â€™)?ll do (?:it|that)|i can do (?:it|that))[.!]*$/i.test(
+    compact(text),
+  );
+}
+
+function contextualTaskTitle(text: string) {
+  const cleaned = compact(text)
+    .replace(/^then\s+/i, "")
+    .replace(
+      /^(?:@[\w_]+\s+)?(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|will\s+you\s+|do\s+you\s+want\s+to\s+|you\s+wanna\s+|u\s+wanna\s+|need\s+you\s+to\s+|you\s+need\s+to\s+|you\s+must\s+)/i,
+      "",
+    )
+    .replace(/[?.!]+$/, "");
+  return (cleaned || compact(text)).slice(0, 240);
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function normalizeUsername(username: string | null) {
   return username?.replace(/^@/, "").trim().toLowerCase() || null;
 }
@@ -540,6 +764,30 @@ function validateDeadlineText(
     .includes(compact(deadlineText).toLocaleLowerCase())
     ? compact(deadlineText)
     : null;
+}
+
+function isDeadlineCommitment(text: string) {
+  return (
+    /\blet me\b/i.test(text) ||
+    /\b(?:i will|i'll|iâ€™ll|i can|i commit to|i am going to)\b/i.test(text)
+  );
+}
+
+function isTaskOwnedBySender(
+  taskId: string,
+  message: TelegramInboundMessage,
+  context: ProjectDetectionContext,
+) {
+  const sender = context.members.find(
+    (member) =>
+      normalizeUsername(member.username) ===
+      normalizeUsername(message.actor?.username ?? null),
+  );
+  return Boolean(
+    sender &&
+      context.tasks.find((task) => task.id === taskId)
+        ?.ownerTelegramUserRecordId === sender.telegramUserRecordId,
+  );
 }
 
 function findLikelyDuplicate(
@@ -636,7 +884,7 @@ function contentTokens(value: string) {
 
 function extractDeadlineText(text: string) {
   const match = text.match(
-    /\b(?:by\s+|due\s+|deadline\s+(?:is\s+)?|to\s+)?(?:today|tomorrow|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|20\d{2}-\d{2}-\d{2})\b/i,
+    /\b(?:by\s+|due\s+|deadline\s+(?:is\s+)?|to\s+)?(?:today|tomorrow|tmr|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|20\d{2}-\d{2}-\d{2})(?:\s+morning)?\b/i,
   );
   return match?.[0]?.trim() ?? null;
 }
@@ -683,16 +931,18 @@ function addCalendarDays(
   };
 }
 
-function localEndOfDayToUtc(
+function localTimeToUtc(
   value: { year: number; month: number; day: number },
   timezone: string,
+  hour: number,
+  minute: number,
 ) {
   const localWallClockUtc = Date.UTC(
     value.year,
     value.month - 1,
     value.day,
-    23,
-    59,
+    hour,
+    minute,
     0,
   );
   const offset = timezoneOffsetMinutes(new Date(localWallClockUtc), timezone);

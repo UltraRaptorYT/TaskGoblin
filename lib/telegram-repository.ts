@@ -38,6 +38,7 @@ export type ProjectEventCandidateReviewResult = {
   taskId: string | null;
   eventType: ProjectEventType;
   summary: string;
+  reminderScheduledFor: string | null;
 };
 
 export type AiDetectionRun = {
@@ -52,6 +53,7 @@ export type PersistedProjectEventCandidate = {
   matchedTaskId: string | null;
   duplicateOfTaskId: string | null;
   duplicateOfCandidateId: string | null;
+  dueLabel: string | null;
 };
 
 export type TelegramTaskRow = {
@@ -226,12 +228,45 @@ export async function createTaskCandidate(
 export async function loadProjectDetectionContext(
   supabase: SupabaseClient,
   projectId: string,
+  window: {
+    telegramChatRecordId: string;
+    beforeTelegramMessageId: number;
+    messageThreadId: number | null;
+    sentAt: string | null;
+  },
 ): Promise<ProjectDetectionContext> {
+  let recentMessagesQuery = supabase
+    .from("taskgoblin_telegram_messages")
+    .select(
+      "telegram_message_id, telegram_user_record_id, sent_at, plain_text, reply_to_telegram_message_id",
+    )
+    .eq("project_id", projectId)
+    .eq("telegram_chat_record_id", window.telegramChatRecordId)
+    .lt("telegram_message_id", window.beforeTelegramMessageId)
+    .in("message_type", ["message", "edited_message"])
+    .neq("plain_text", "")
+    .order("telegram_message_id", { ascending: false })
+    .limit(12);
+  recentMessagesQuery =
+    window.messageThreadId === null
+      ? recentMessagesQuery.is("message_thread_id", null)
+      : recentMessagesQuery.eq("message_thread_id", window.messageThreadId);
+  if (window.sentAt) {
+    const sentAt = new Date(window.sentAt);
+    if (!Number.isNaN(sentAt.getTime())) {
+      recentMessagesQuery = recentMessagesQuery.gte(
+        "sent_at",
+        new Date(sentAt.getTime() - 30 * 60 * 1000).toISOString(),
+      );
+    }
+  }
+
   const [
     { data: project, error: projectError },
     { data: memberRows, error: memberError },
     { data: taskRows, error: taskError },
     { data: candidateRows, error: candidateError },
+    { data: recentMessageRows, error: recentMessageError },
   ] = await Promise.all([
     supabase
       .from("taskgoblin_projects")
@@ -256,6 +291,7 @@ export async function loadProjectDetectionContext(
       .in("state", ["detected", "awaiting_confirmation", "confirmed"])
       .order("created_at", { ascending: false })
       .limit(50),
+    recentMessagesQuery,
   ]);
   if (projectError || !project) {
     throw new Error(
@@ -271,6 +307,11 @@ export async function loadProjectDetectionContext(
   if (candidateError) {
     throw new Error(
       `Could not load recent project event candidates: ${candidateError.message}`,
+    );
+  }
+  if (recentMessageError) {
+    throw new Error(
+      `Could not load recent Telegram messages: ${recentMessageError.message}`,
     );
   }
 
@@ -315,6 +356,30 @@ export async function loadProjectDetectionContext(
       eventType: row.event_type as ProjectEventType,
       summary: row.summary as string,
     })),
+    recentMessages: (recentMessageRows ?? [])
+      .map((row) => {
+        const telegramUserRecordId =
+          (row.telegram_user_record_id as string | null) ?? null;
+        const member = telegramUserRecordId
+          ? (memberRows ?? []).find(
+              (candidate) =>
+                candidate.telegram_user_id === telegramUserRecordId,
+            )
+          : null;
+        return {
+          telegramMessageId: Number(row.telegram_message_id),
+          sentAt: (row.sent_at as string | null) ?? null,
+          senderUsername: telegramUserRecordId
+            ? usersById.get(telegramUserRecordId)?.username ?? null
+            : null,
+          senderDisplayName:
+            (member?.display_name as string | undefined) ?? "Unknown",
+          text: row.plain_text as string,
+          replyToTelegramMessageId:
+            (row.reply_to_telegram_message_id as number | null) ?? null,
+        };
+      })
+      .reverse(),
   };
 }
 
@@ -415,7 +480,7 @@ export async function createProjectEventCandidate(
       rationale: event.rationale,
     })
     .select(
-      "id, event_type, summary, confidence, matched_task_id, duplicate_of_task_id, duplicate_of_candidate_id",
+      "id, event_type, summary, confidence, matched_task_id, duplicate_of_task_id, duplicate_of_candidate_id, proposed_due_label",
     )
     .single();
   if (error || !data) {
@@ -433,6 +498,7 @@ export async function createProjectEventCandidate(
       (data.duplicate_of_task_id as string | null) ?? null,
     duplicateOfCandidateId:
       (data.duplicate_of_candidate_id as string | null) ?? null,
+    dueLabel: (data.proposed_due_label as string | null) ?? null,
   };
 }
 
@@ -443,7 +509,7 @@ export async function findProjectEventCandidateBySource(
   const { data, error } = await supabase
     .from("taskgoblin_project_event_candidates")
     .select(
-      "id, event_type, summary, confidence, matched_task_id, duplicate_of_task_id, duplicate_of_candidate_id",
+      "id, event_type, summary, confidence, matched_task_id, duplicate_of_task_id, duplicate_of_candidate_id, proposed_due_label",
     )
     .eq("source_telegram_message_id", sourceMessage.id)
     .maybeSingle();
@@ -463,6 +529,7 @@ export async function findProjectEventCandidateBySource(
       (data.duplicate_of_task_id as string | null) ?? null,
     duplicateOfCandidateId:
       (data.duplicate_of_candidate_id as string | null) ?? null,
+    dueLabel: (data.proposed_due_label as string | null) ?? null,
   };
 }
 
@@ -520,12 +587,31 @@ export async function reviewProjectEventCandidate(
     event_type: ProjectEventType;
     summary: string;
   };
+  let reminderScheduledFor: string | null = null;
+  if (row.candidate_state === "confirmed" && row.task_id) {
+    const { data: reminder, error: reminderError } = await supabase
+      .from("taskgoblin_reminders")
+      .select("scheduled_for")
+      .eq("task_id", row.task_id)
+      .eq("status", "scheduled")
+      .order("scheduled_for", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (reminderError) {
+      throw new Error(
+        `Could not load the scheduled task reminder: ${reminderError.message}`,
+      );
+    }
+    reminderScheduledFor =
+      (reminder?.scheduled_for as string | null | undefined) ?? null;
+  }
   return {
     candidateId: row.candidate_id,
     state: row.candidate_state,
     taskId: row.task_id,
     eventType: row.event_type,
     summary: row.summary,
+    reminderScheduledFor,
   };
 }
 

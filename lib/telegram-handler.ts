@@ -374,6 +374,10 @@ function projectEventCandidateMessage(
     "",
     candidate.summary,
   ];
+  if (candidate.dueLabel) {
+    lines.push("", `Deadline: ${candidate.dueLabel}`);
+    lines.push("A private reminder will be queued one hour before.");
+  }
   if (duplicate) lines.push("", duplicate);
   lines.push(
     "",
@@ -415,12 +419,37 @@ function projectEventCallbackMessage(
       review.eventType === "task_proposal" ||
       review.eventType === "explicit_task_assignment"
     ) {
-      return `Task created: ${review.summary}`;
+      return confirmedProjectEventMessage(
+        `Task created: ${review.summary}`,
+        review.reminderScheduledFor,
+      );
     }
-    return `Project event recorded: ${review.summary}`;
+    return confirmedProjectEventMessage(
+      `Project event recorded: ${review.summary}`,
+      review.reminderScheduledFor,
+    );
   }
   if (review.state === "edited") {
     return `Candidate marked for editing: ${review.summary}\nInteractive edit capture is not available yet.`;
   }
   return `Candidate ignored: ${review.summary}`;
+}
+
+function confirmedProjectEventMessage(
+  message: string,
+  reminderScheduledFor: string | null,
+) {
+  return reminderScheduledFor
+    ? `${message}\nPrivate reminder queued for ${formatReminderTime(reminderScheduledFor)}.`
+    : message;
+}
+
+function formatReminderTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-SG", {
+    timeZone: "Asia/Singapore",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }

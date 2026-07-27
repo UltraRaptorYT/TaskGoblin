@@ -17,6 +17,8 @@ type FixtureCase = {
   senderUsername: string;
   expectedEventType: ProjectEventType | "none";
   recentCandidates?: ProjectDetectionContext["recentCandidates"];
+  recentMessages?: ProjectDetectionContext["recentMessages"];
+  replyToMessageId?: number | null;
 };
 
 const context: ProjectDetectionContext = {
@@ -25,6 +27,7 @@ const context: ProjectDetectionContext = {
   members: fixtures.members,
   tasks: fixtures.tasks as ProjectDetectionContext["tasks"],
   recentCandidates: [],
+  recentMessages: [],
 };
 
 describe.runIf(process.env.RUN_OPENAI_EVAL === "1")(
@@ -60,6 +63,7 @@ describe.runIf(process.env.RUN_OPENAI_EVAL === "1")(
                   {
                     ...context,
                     recentCandidates: testCase.recentCandidates ?? [],
+                    recentMessages: testCase.recentMessages ?? [],
                   },
                   { mode: "openai" },
                 );
@@ -119,7 +123,7 @@ function messageFor(testCase: FixtureCase): TelegramInboundMessage {
       username: testCase.senderUsername,
       languageCode: "en",
     },
-    replyToMessageId: null,
+    replyToMessageId: testCase.replyToMessageId ?? null,
     messageThreadId: null,
     raw: {},
   };

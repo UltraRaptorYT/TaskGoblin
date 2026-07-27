@@ -36,6 +36,12 @@ export async function detectAndPersistProjectEvent(
   const detectionContext = await loadProjectDetectionContext(
     supabase,
     telegramContext.projectId,
+    {
+      telegramChatRecordId: telegramContext.chatRecordId!,
+      beforeTelegramMessageId: message.messageId,
+      messageThreadId: message.messageThreadId,
+      sentAt: message.sentAt,
+    },
   );
   const config = projectEventDetectorConfig();
   const run = await startAiDetectionRun(
