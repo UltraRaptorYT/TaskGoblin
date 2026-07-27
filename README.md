@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TaskGoblin
 
-## Getting Started
+TaskGoblin is a Telegram-native AI project manager. The live Telegram pipeline
+receives group updates, persists chats, users, members and messages, detects one
+supported project event per message, and asks for confirmation through inline
+buttons before changing project state.
 
-First, run the development server:
+The older Telegram-export and project-brief import flow remains available in
+the web application.
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Verification commands:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npm test
+npm run test:evaluate
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment
 
-## Learn More
+Copy `.env.example` to `.env.local` and configure at least:
 
-To learn more about Next.js, take a look at the following resources:
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+OPENAI_EVENT_MODEL=gpt-5.6-sol
+TELEGRAM_EVENT_DETECTION_MODE=openai
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+TELEGRAM_BOT_USERNAME=
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`TELEGRAM_WEBHOOK_SECRET` is mandatory for the webhook. Requests fail closed
+when it is absent.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database
 
-## Deploy on Vercel
+Apply the checked-in Supabase migrations before registering the webhook:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx supabase db push
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Phase 1 adds:
+
+- Telegram chats and users
+- Telegram project membership
+- idempotent webhook update receipts
+- live-message fields on the existing Telegram message table
+- task candidates and their confirmation state
+- Telegram ownership/source references on confirmed tasks
+
+The per-message AI migration additionally adds project timezone, auditable AI
+detection runs, generic project-event candidates, duplicate/task-match
+references, and an atomic human-review transition.
+
+A new group is provisioned with a workspace and project when its first update
+is processed. This is an MVP default and can later be replaced by an explicit
+admin linking flow.
+
+## Telegram webhook
+
+Register the deployed route with Telegram and use the same secret configured in
+the application:
+
+```text
+https://YOUR_DEPLOYMENT/api/telegram/webhook
+```
+
+Configure Telegram to send the secret in
+`X-Telegram-Bot-Api-Secret-Token`. The bot currently handles:
+
+- `/help`
+- `/summary`
+- `/tasks`
+- `/mytasks`
+- project-event Confirm, Edit and Ignore callbacks
+
+Set `TELEGRAM_EVENT_DETECTION_MODE=openai` and provide `OPENAI_API_KEY` for
+OpenAI Structured Outputs. Set the mode to `mock`, or omit the key without
+forcing OpenAI mode, for the deterministic development detector. The mock
+detector uses no provider calls and is evaluated against the held-out fixture
+set with `npm run test:evaluate`. With a provider key configured, run
+`npm run test:evaluate:openai` to measure the real Structured Outputs path.
+
+The model can propose task creation, assignment, progress, completion,
+deadline, blocker and decision events. Application code validates owner
+usernames against known members, task references against current tasks and
+deadline text against the source message. Every accepted event is persisted as
+a candidate before Telegram controls are sent; only a callback can apply it.
+
+To observe ordinary group messages, configure the bot's Telegram privacy mode
+appropriately and disclose the bot's message processing to group members.

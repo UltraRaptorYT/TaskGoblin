@@ -122,3 +122,68 @@ export type TelegramImportResponse = {
   };
   scan: TaskScanResult;
 };
+
+export type TelegramChatType =
+  | "private"
+  | "group"
+  | "supergroup"
+  | "channel"
+  | "unknown";
+
+export type TelegramActor = {
+  id: number;
+  isBot: boolean;
+  firstName: string;
+  lastName: string | null;
+  username: string | null;
+  languageCode: string | null;
+};
+
+export type TelegramChat = {
+  id: number;
+  type: TelegramChatType;
+  title: string | null;
+  username: string | null;
+};
+
+export type TelegramInboundMessage = {
+  kind: "message";
+  updateId: number;
+  updateType:
+    | "message"
+    | "edited_message"
+    | "channel_post"
+    | "edited_channel_post";
+  messageId: number;
+  sentAt: string | null;
+  editedAt: string | null;
+  text: string;
+  chat: TelegramChat;
+  actor: TelegramActor | null;
+  replyToMessageId: number | null;
+  messageThreadId: number | null;
+  raw: unknown;
+};
+
+export type TelegramInboundCallback = {
+  kind: "callback_query";
+  updateId: number;
+  updateType: "callback_query";
+  callbackQueryId: string;
+  data: string | null;
+  chat: TelegramChat | null;
+  actor: TelegramActor;
+  messageId: number | null;
+  raw: unknown;
+};
+
+export type TelegramInboundUpdate =
+  | TelegramInboundMessage
+  | TelegramInboundCallback;
+
+export type TaskCandidateState =
+  | "detected"
+  | "awaiting_confirmation"
+  | "confirmed"
+  | "edited"
+  | "ignored";

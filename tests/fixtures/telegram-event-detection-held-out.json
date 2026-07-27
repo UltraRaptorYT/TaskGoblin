@@ -1,0 +1,246 @@
+{
+  "members": [
+    {
+      "telegramUserRecordId": "user-alice",
+      "username": "alice",
+      "displayName": "Alice"
+    },
+    {
+      "telegramUserRecordId": "user-bob",
+      "username": "bob",
+      "displayName": "Bob"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-ui",
+      "title": "Build project UI",
+      "status": "doing",
+      "ownerTelegramUserRecordId": "user-alice",
+      "dueLabel": "Friday"
+    },
+    {
+      "id": "task-webhook",
+      "title": "Implement Telegram webhook",
+      "status": "todo",
+      "ownerTelegramUserRecordId": "user-bob",
+      "dueLabel": null
+    },
+    {
+      "id": "task-demo",
+      "title": "Prepare launch demo",
+      "status": "todo",
+      "ownerTelegramUserRecordId": null,
+      "dueLabel": null
+    },
+    {
+      "id": "task-copy",
+      "title": "Write landing page copy",
+      "status": "doing",
+      "ownerTelegramUserRecordId": "user-alice",
+      "dueLabel": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "assignment-known-1",
+      "category": "explicit_assignments",
+      "text": "@alice please prepare the launch demo by Friday",
+      "senderUsername": "bob",
+      "expectedEventType": "explicit_task_assignment"
+    },
+    {
+      "id": "assignment-known-2",
+      "category": "explicit_assignments",
+      "text": "@bob can you write the release notes",
+      "senderUsername": "alice",
+      "expectedEventType": "explicit_task_assignment"
+    },
+    {
+      "id": "vague-1",
+      "category": "vague_suggestions",
+      "text": "Maybe we should make the project UI shinier",
+      "senderUsername": "alice",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "vague-2",
+      "category": "vague_suggestions",
+      "text": "Someone should perhaps look at analytics",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "joke-1",
+      "category": "jokes",
+      "text": "@alice please delete production lol",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "joke-2",
+      "category": "jokes",
+      "text": "I finished the project UI, just kidding",
+      "senderUsername": "alice",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "repeat-original",
+      "category": "repeated_messages",
+      "text": "I will organize customer interviews",
+      "senderUsername": "alice",
+      "expectedEventType": "task_proposal"
+    },
+    {
+      "id": "repeat-duplicate",
+      "category": "repeated_messages",
+      "text": "I will organize customer interviews",
+      "senderUsername": "alice",
+      "recentCandidates": [
+        {
+          "id": "candidate-interviews",
+          "eventType": "task_proposal",
+          "summary": "I will organize customer interviews"
+        }
+      ],
+      "expectedEventType": "task_proposal",
+      "expectedDuplicate": true
+    },
+    {
+      "id": "ambiguous-owner-1",
+      "category": "ambiguous_owners",
+      "text": "@charlie please prepare the budget",
+      "senderUsername": "alice",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "ambiguous-owner-2",
+      "category": "ambiguous_owners",
+      "text": "Alex please prepare the budget",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "relative-deadline-1",
+      "category": "relative_deadlines",
+      "text": "@alice please ship the onboarding checklist tomorrow",
+      "senderUsername": "bob",
+      "expectedEventType": "explicit_task_assignment",
+      "expectResolvedDeadline": true
+    },
+    {
+      "id": "relative-deadline-2",
+      "category": "relative_deadlines",
+      "text": "We need to finalize pricing by next Tuesday",
+      "senderUsername": "alice",
+      "expectedEventType": "task_proposal",
+      "expectResolvedDeadline": true
+    },
+    {
+      "id": "completion-1",
+      "category": "completion_claims",
+      "text": "I finished the project UI",
+      "senderUsername": "alice",
+      "expectedEventType": "possible_task_completion",
+      "expectedMatchedTaskId": "task-ui"
+    },
+    {
+      "id": "completion-ambiguous",
+      "category": "completion_claims",
+      "text": "Done with it",
+      "senderUsername": "alice",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "unrelated-1",
+      "category": "unrelated_conversation",
+      "text": "Anyone up for lunch?",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "unrelated-2",
+      "category": "unrelated_conversation",
+      "text": "The rain is wild today",
+      "senderUsername": "alice",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "progress-1",
+      "category": "progress_updates",
+      "text": "Working on the Telegram webhook, about halfway",
+      "senderUsername": "bob",
+      "expectedEventType": "task_progress_update",
+      "expectedMatchedTaskId": "task-webhook"
+    },
+    {
+      "id": "progress-ambiguous",
+      "category": "progress_updates",
+      "text": "Working on it now",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "deadline-update-1",
+      "category": "deadline_updates",
+      "text": "Move the project UI deadline to 2026-08-01",
+      "senderUsername": "alice",
+      "expectedEventType": "deadline_update",
+      "expectedMatchedTaskId": "task-ui",
+      "expectResolvedDeadline": true
+    },
+    {
+      "id": "deadline-update-2",
+      "category": "deadline_updates",
+      "text": "Push the Telegram webhook due date to Friday",
+      "senderUsername": "bob",
+      "expectedEventType": "deadline_update",
+      "expectedMatchedTaskId": "task-webhook",
+      "expectResolvedDeadline": true
+    },
+    {
+      "id": "blocker-task",
+      "category": "blockers",
+      "text": "Blocked on the Telegram webhook waiting on the bot token",
+      "senderUsername": "bob",
+      "expectedEventType": "blocker",
+      "expectedMatchedTaskId": "task-webhook"
+    },
+    {
+      "id": "blocker-project",
+      "category": "blockers",
+      "text": "We are blocked waiting on legal approval",
+      "senderUsername": "alice",
+      "expectedEventType": "blocker"
+    },
+    {
+      "id": "decision-1",
+      "category": "decisions",
+      "text": "We decided to launch with Telegram only",
+      "senderUsername": "alice",
+      "expectedEventType": "decision"
+    },
+    {
+      "id": "decision-vague",
+      "category": "decisions",
+      "text": "I think maybe Telegram-only would be simpler",
+      "senderUsername": "bob",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "proposal-commitment",
+      "category": "task_proposals",
+      "text": "I will create the onboarding checklist by tomorrow",
+      "senderUsername": "alice",
+      "expectedEventType": "task_proposal",
+      "expectResolvedDeadline": true
+    },
+    {
+      "id": "proposal-need",
+      "category": "task_proposals",
+      "text": "We need to document rollback steps",
+      "senderUsername": "bob",
+      "expectedEventType": "task_proposal"
+    }
+  ]
+}

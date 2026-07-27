@@ -1,143 +1,408 @@
-# TaskGoblin Agent Brief
+# TaskGoblin Repository Guide
 
-## Project Identity
+## Product Identity
 
-TaskGoblin turns Telegram chaos into finished projects.
+TaskGoblin turns Telegram project conversations into structured, accountable work.
 
-TaskGoblin is a Telegram-first AI accountability workspace. Users import Telegram Desktop exports, OpenAI extracts project intelligence, the team reviews work on a light Jira-style board, and the Goblin helps keep people accountable through task health, source traces, and Telegram reminder nudges.
+TaskGoblin is a Telegram-native AI project manager. It lives inside a Telegram group, observes project conversations, detects possible tasks, owners, deadlines, decisions, blockers, and progress updates, and maintains a structured project state behind the chat.
 
-## Product Goal
+Telegram is the primary interface.
 
-The product goal is to turn messy group chats into an accountable project system: tasks, owners, deadlines, decisions, questions, blockers, risks, project history, and reminders.
+A web interface may exist later as a secondary administration or visualisation surface, but the core MVP must work inside Telegram.
 
-Pitch lines:
+## Core Product Principle
 
-- Jira for group chats.
-- Turns Telegram chaos into tasks, owners, deadlines, and reminders.
-- Your group project accountability goblin.
+TaskGoblin is not a generic chatbot and not a disposable conversation summariser.
 
-## MVP Scope
+It maintains a persistent project state derived from Telegram conversations.
 
-Build the first real MVP around Telegram Desktop import:
+The core loop is:
 
-- Upload Telegram `result.json` or export `.zip`.
-- Parse chat metadata, participants, service messages, normal messages, and string or rich-array text.
-- Scan the normalized transcript with OpenAI Structured Outputs.
-- Persist projects, imports, messages, scan runs, tasks, risks, questions, decisions, blockers, comments, history, reminders, and delivery records in Supabase.
-- Show a light Jira board with Backlog, To Do, Doing, Blocked, Done, and Overdue.
-- Let users assign owners, update due labels/status/priority, inspect source snippets, and stage Telegram reminders.
-- Keep demo-mode fallbacks working when OpenAI or Supabase env vars are missing.
+1. Observe a Telegram message.
+2. Detect a possible project event.
+3. Extract structured information.
+4. Ask for confirmation when the information is uncertain or consequential.
+5. Persist the confirmed event.
+6. Allow users to query or modify project state through Telegram.
+7. Send relevant reminders and updates.
 
-V1 limits:
+Project events may include:
 
-- No full Jira clone: no sprints, epics, story points, custom workflows, or reporting.
-- Telegram historical ingestion is export-based; a bot can only handle future updates after it is connected.
-- Google Calendar is a later integration; optional `.ics` export is acceptable if cheap.
+- task creation
+- task assignment
+- deadline creation or change
+- task completion
+- progress updates
+- project decisions
+- blockers
+- questions
+- risks
+- milestones
 
-## User Experience
+## Current MVP Goal
 
-The first screen should be the usable product, not a landing page.
+Build a working Telegram-native prototype that demonstrates:
 
-Core flow:
+- adding TaskGoblin to a Telegram group
+- receiving Telegram webhook updates
+- identifying possible tasks from natural conversation
+- preserving the source message
+- asking users to confirm, edit, or ignore detected tasks
+- persisting confirmed tasks and project state
+- querying project state through Telegram commands
+- updating and completing tasks
+- sending private due-date reminders to task owners
+- keeping a clear event history
 
-1. User signs in.
-2. User uploads Telegram Desktop `result.json` or export ZIP.
-3. TaskGoblin normalizes the export and runs a scan.
-4. User reviews the board, risks, decisions, questions, and blockers.
-5. User confirms or edits tasks.
-6. User assigns owners and schedules Telegram reminders.
-7. Project history records import, scan, assignment, reminder, and board events.
+The MVP should prove that TaskGoblin can translate unstructured team conversation into a reliable, queryable project state.
 
-The Goblin appears as:
+## Primary User Experience
 
-- Scanner: extracts structured work from chat.
-- Board copilot: flags ghost tasks, blockers, missing deadlines, stale work, and project health.
-- Reminder agent: writes nudges in Professional, Friendly, or Goblin Mode.
+The main user experience happens in Telegram.
 
-## Data Model
+Example:
 
-Shared app types live in `lib/taskgoblin-types.ts`.
+User:
 
-Important public shapes:
+@alex can you create the project UI by Friday?
 
-- `NormalizedTelegramImport`: normalized chat id, name, type, participants, and messages.
-- `TaskScanResult`: summary, project health, tasks, decisions, questions, risks, blockers, and accountability suggestions.
-- `TaskItem`: id, title, optional description, owner, deadline, status, priority, confidence, source message ids, and optional source snippet.
+TaskGoblin:
 
-Supabase schema lives in `supabase/migrations/0001_taskgoblin_full_mvp.sql`.
+Possible task detected:
 
-Primary tables:
+Task: Create the project UI
+Owner: @alex
+Deadline: Friday
 
-- `profiles`, `workspaces`, `workspace_members`
-- `projects`, `project_members`, `project_events`
-- `telegram_imports`, `telegram_messages`, `chat_participants`
-- `scan_runs`
-- `tasks`, `task_comments`
-- `decisions`, `questions`, `risks`, `blockers`
-- `reminders`, `notification_deliveries`
+[Confirm] [Edit] [Ignore]
 
-All app tables should have RLS enabled. Members can read their project data; project admins manage project membership and destructive/admin actions; service-role server routes handle imports, AI scan writes, and Telegram webhook writes.
+After confirmation:
 
-## Architecture Notes
+Task #12 created.
+Owner: @alex
+Deadline: Friday.
 
-Use the existing stack:
+Later:
 
-- Next.js 16 App Router.
-- React 19.
-- Tailwind CSS 4.
-- shadcn-style UI components.
-- lucide-react icons.
-- Supabase Auth and Postgres.
-- OpenAI Responses API with Structured Outputs.
-- Telegram Bot API for reminder delivery and future bot updates.
+User:
 
-Important framework rule:
+I finished the UI. Here is the screenshot.
 
-- This is not assumed to be the Next.js version from model memory. Before coding against Next.js APIs, routing conventions, caching, server components, route handlers, metadata, auth boundaries, or file structure, read the relevant guide in `node_modules/next/dist/docs/` and follow that version's guidance.
+TaskGoblin:
 
-Current implementation map:
+Is this an update for Task #12 — Create the project UI?
 
-- `app/page.tsx` renders the main workspace.
-- `app/taskgoblin-app.tsx` is the interactive upload, board, task detail, and reminder UI.
-- `app/api/imports/telegram/route.ts` accepts Telegram JSON/ZIP uploads.
-- `app/api/imports/[id]/scan/route.ts` is the scan endpoint scaffold.
-- `app/api/tasks/[id]/route.ts` updates task fields.
-- `app/api/tasks/[id]/reminders/route.ts` schedules reminder records.
-- `app/api/messages/accountability/route.ts` generates reminder copy.
-- `app/api/telegram/webhook/route.ts` receives Telegram bot webhook payloads.
-- `lib/telegram-parser.ts` normalizes Telegram exports.
-- `lib/openai-scan.ts` contains the OpenAI scan pipeline.
-- `lib/mock-scan.ts` keeps demo mode usable without provider keys.
+[Mark complete] [Add progress update] [Not related]
 
-Environment variables are documented in `.env.example`.
+## Telegram Commands
 
-## AI Behavior Rules
+Implement or preserve the following MVP commands:
 
-For both mock and OpenAI-backed scans:
+- `/help`
+  Show the available commands.
 
-- Extract only supported fields.
-- Preserve source message ids whenever possible.
-- Mark uncertainty with lower confidence rather than inventing facts.
-- Do not invent task owners or deadlines.
-- Surface ghost tasks when no owner is clear.
-- Surface blockers when one task depends on unfinished or missing work.
-- Surface missing deadlines and vague promises as risks.
-- Keep accountability messages useful and safe for real teammates.
-- Goblin Mode may be funny, but it should not be cruel, discriminatory, or abusive.
+- `/summary`
+  Show a concise summary of project progress, active work, blockers, recent decisions, and upcoming deadlines.
 
-## Design Direction
+- `/project`
+  Show project purpose, current phase, priorities, milestones, and overall state.
 
-TaskGoblin should look like a working project dashboard.
+- `/tasks`
+  Show active project tasks.
 
-Guidelines:
+- `/mytasks`
+  Show tasks owned by the requesting user, grouped by overdue, upcoming, blocked, and completed.
 
-- Prioritize Telegram import, board review, assignment, risk inspection, and reminders.
-- Use compact dashboards and readable board cards.
-- Show source snippets so users trust the AI output.
-- Use lucide-react icons in buttons and controls.
-- Keep playful branding secondary to workflow clarity.
-- Avoid oversized hero sections, generic SaaS copy, and decorative card-heavy pages.
-- Ensure mobile and desktop layouts remain readable.
+- `/addtask`
+  Manually create a task.
+
+  Example:
+  `/addtask Prepare the demo | owner: @alex | deadline: Friday`
+
+- `/done`
+  Mark a task as completed.
+
+  Example:
+  `/done 12`
+
+- `/update`
+  Update task owner, status, deadline, or priority.
+
+  Examples:
+  `/update 12 status blocked`
+  `/update 12 deadline Friday`
+  `/update 12 owner @alex`
+
+- `/recent`
+  Show recent task, deadline, decision, blocker, and milestone changes.
+
+- `/setproject`
+  Set the project name, goal, or final deadline.
+
+- `/addmilestone`
+  Create a project milestone.
+
+Optional after the core flow works:
+
+- `/kpi`
+- `/blockers`
+- `/unassigned`
+
+## Behaviour Rules
+
+### Detection
+
+Do not convert every suggestion into a task.
+
+Distinguish between:
+
+- ideas
+- requests
+- tentative suggestions
+- explicit commitments
+- explicit assignments
+- progress updates
+- completed work
+
+Messages such as “let’s make a UI” should normally produce a low-confidence proposal or no task.
+
+Messages such as “@alex, please create the UI by Friday” are stronger task candidates.
+
+### Confirmation
+
+Require confirmation before persisting consequential inferred changes when confidence is not sufficiently high.
+
+Consequential changes include:
+
+- assigning an owner
+- setting or changing a deadline
+- marking a task complete
+- deleting a task
+- creating a milestone
+- recording an important project decision
+
+Use Telegram inline buttons where appropriate:
+
+- Confirm
+- Edit
+- Ignore
+- Mark complete
+- Add update
+- Report blocker
+
+### Accuracy
+
+- Never invent owners.
+- Never invent deadlines.
+- Never fabricate project metrics.
+- Preserve Telegram message IDs and source context.
+- Represent uncertainty explicitly.
+- Avoid creating duplicate tasks from repeated messages.
+- Resolve relative dates using the message timestamp and project timezone.
+- Ask for clarification where an owner, deadline, or referenced task is ambiguous.
+
+### Task Completion
+
+Do not automatically mark a task complete solely because a user says something that resembles completion.
+
+Match the message against existing tasks and request confirmation.
+
+Attachments may be stored as supporting evidence, but an attachment alone does not prove completion.
+
+### Metrics
+
+Metrics must be calculated only from stored confirmed data.
+
+Examples:
+
+- open task count
+- completed task count
+- overdue task count
+- tasks without owners
+- active blockers
+- task completion rate
+
+Do not claim a project is “70% complete” unless the calculation method is explicit.
+
+### Reminders
+
+Task reminders should normally be sent privately to the assigned user.
+
+A reminder should include:
+
+- project
+- task
+- deadline
+- status
+- actions such as Mark done, Update deadline, or Report blocker
+
+Avoid publicly shaming users in group chats.
+
+Group escalation should only happen when explicitly configured.
+
+## MVP Boundaries
+
+Do not build a full Jira clone.
+
+Exclude unless needed for the demonstrated core flow:
+
+- sprints
+- epics
+- story points
+- custom workflows
+- extensive analytics
+- billing
+- complex role management
+- Google Calendar integration
+- multiple chat platforms
+- advanced workload balancing
+- autonomous project planning
+
+Do not make Telegram export upload the main product flow.
+
+Legacy Telegram import functionality may remain temporarily for testing or migration, but it must not define the primary architecture or user experience.
+
+## Architecture Direction
+
+Use the existing stack where practical:
+
+- Next.js 16 App Router
+- React 19
+- Tailwind CSS 4
+- Supabase Auth and Postgres
+- OpenAI Responses API with Structured Outputs
+- Telegram Bot API
+- Telegram webhooks
+- scheduled worker or cron-compatible reminder processing
+
+Before using Next.js APIs or conventions, inspect the installed Next.js documentation under:
+
+`node_modules/next/dist/docs/`
+
+Follow the version installed in the repository rather than relying on remembered framework behaviour.
+
+## Suggested Domain Model
+
+Maintain a persistent project state with entities such as:
+
+- profiles
+- telegram_users
+- telegram_chats
+- projects
+- project_members
+- project_events
+- telegram_messages
+- ai_detection_runs
+- task_candidates
+- tasks
+- task_updates
+- decisions
+- questions
+- blockers
+- milestones
+- reminders
+- notification_deliveries
+
+Important relationships:
+
+- a Telegram chat may correspond to one active project
+- Telegram users must be linked to project members
+- every inferred item should reference its source Telegram message where possible
+- task candidates should be separate from confirmed tasks
+- project events should provide an auditable timeline
+
+## Recommended State Transitions
+
+Task candidate:
+
+`detected -> awaiting_confirmation -> confirmed | edited | ignored`
+
+Task:
+
+`backlog -> todo -> doing -> blocked -> done`
+
+Reminder:
+
+`scheduled -> delivered | failed | cancelled`
+
+## Security And Privacy
+
+- Validate Telegram webhook secrets.
+- Do not trust Telegram payload fields without validation.
+- Restrict project data to the corresponding Telegram chat and authorised users.
+- Use row-level security for application data.
+- Avoid storing more message content than required.
+- Provide a clear strategy for retention and deletion.
+- Do not expose service-role credentials to client-side code.
+- Log AI decisions without storing secrets.
+- Treat private reminder delivery and Telegram account linking carefully.
+
+## AI Pipeline
+
+Use a structured pipeline rather than a single unrestricted chatbot response.
+
+Suggested stages:
+
+1. Normalise Telegram update.
+2. Classify whether the message contains a project event.
+3. Extract a typed candidate event.
+4. Match against existing project state.
+5. Detect duplicates or conflicts.
+6. Calculate confidence.
+7. Decide whether confirmation is required.
+8. Persist the candidate or confirmed event.
+9. Generate the Telegram response.
+
+Use Structured Outputs for machine-consumed model responses.
+
+Keep natural-language generation separate from state mutation.
+
+The model must never directly write arbitrary database mutations.
+
+## Web Interface
+
+The website is secondary.
+
+Use it only where it provides clear value, such as:
+
+- bot setup
+- Telegram account linking
+- project configuration
+- privacy and retention settings
+- audit history
+- debugging
+- optional board visualisation
+
+Do not require users to use the website for normal task creation, summaries, updates, or completion.
+
+## Legacy Code
+
+The repository contains an older upload-first implementation.
+
+Before deleting or rewriting code:
+
+1. identify which modules are reusable
+2. identify which modules are legacy-only
+3. identify database migrations that require replacement or migration
+4. preserve useful extraction, task, reminder, and source-trace logic
+5. avoid destructive schema changes without documenting the migration path
+
+Likely reusable concepts:
+
+- structured OpenAI extraction
+- tasks
+- source traces
+- reminders
+- project events
+- Supabase integration
+- Telegram webhook scaffold
+
+Likely legacy concepts:
+
+- Telegram Desktop export as the primary onboarding flow
+- upload-first application navigation
+- web board as the primary workspace
+- scan-run flow that assumes a complete historical transcript
 
 ## Testing And Verification
 
@@ -146,22 +411,4 @@ Run after implementation changes:
 ```bash
 npm run lint
 npm run build
-```
-
-Manual checks:
-
-- Upload Telegram `result.json`.
-- Upload Telegram ZIP containing `result.json`.
-- Confirm string text and rich text arrays become plain transcript text.
-- Confirm service messages do not break import.
-- Confirm scan output renders board lanes, risks, questions, decisions, and blockers.
-- Confirm owner, status, and due label edits update the UI.
-- Confirm reminder tone changes the generated message.
-- Confirm app remains usable without OpenAI/Supabase env vars.
-
-Provider checks when configured:
-
-- Supabase migration applies cleanly.
-- RLS blocks non-members from project data.
-- OpenAI scan returns schema-valid JSON.
-- Telegram webhook records delivery payloads.
+npm test
