@@ -1,5 +1,10 @@
-import TaskGoblinApp from "@/app/taskgoblin-app";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return <TaskGoblinApp />;
+import { getTelegramWebIdentity } from "@/lib/telegram-web-auth";
+
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const identity = await getTelegramWebIdentity();
+  redirect(identity ? "/dashboard" : "/login");
 }

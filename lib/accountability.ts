@@ -1,21 +1,45 @@
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 import type { AccountabilityTone, TaskItem } from "@/lib/taskgoblin-types";
+
+export const DEFAULT_OPENAI_REMINDER_MODEL = "gpt-5.6-luna";
+
+type OpenAIReminderOptions = {
+  apiKey?: string;
+  model?: string;
+  client?: OpenAI;
+};
 
 export async function generateAccountabilityMessage(
   task: TaskItem,
   tone: AccountabilityTone,
+  options: OpenAIReminderOptions = {},
 ) {
-  if (tone !== "goblin" || !process.env.GEMINI_API_KEY) {
+  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+  if (!apiKey && !options.client) {
     return createAccountabilityMessage(task, tone);
   }
 
   try {
     const currentTime = formatSingaporeTime();
-    const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await client.models.generateContent({
-      model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
-      contents: JSON.stringify({
+    const client = options.client ?? new OpenAI({ apiKey });
+    const toneInstruction =
+      tone === "professional"
+        ? "Use a concise, respectful, professional tone."
+        : tone === "friendly"
+          ? "Use a warm, encouraging, conversational tone without sounding corporate."
+          : "Sound theatrical, eerie, witty, and mischievous—as if an ancient goblin ledger is tracking unfinished work. Never sound cruel or genuinely threatening.";
+    const response = await client.responses.create({
+      model:
+        options.model ??
+        process.env.OPENAI_REMINDER_MODEL ??
+        process.env.OPENAI_EVENT_MODEL ??
+        DEFAULT_OPENAI_REMINDER_MODEL,
+      store: false,
+      reasoning: { effort: "none" },
+      instructions:
+        `Write exactly one polished TaskGoblin accountability reminder of 55–100 words across 2–5 sentences. Address the supplied owner by name when present, repeat the exact task title, state the exact supplied deadline when present, and mention the supplied current Singapore time so the timing is concrete. Include task status, priority, or blocker when useful. End by asking for one concrete response: completion, current progress plus next step, or the blocker plus help needed. ${toneInstruction} Never invent an owner, deadline, progress, or time remaining. Return plain text only: no markdown, headings, quotation wrappers, violence, harm, hate, humiliation, profanity, coercion, or genuine threats.`,
+      input: JSON.stringify({
         title: task.title,
         description: task.description ?? null,
         owner: task.owner,
@@ -26,16 +50,14 @@ export async function generateAccountabilityMessage(
         currentTime,
         timezone: "Asia/Singapore",
       }),
-      config: {
-        systemInstruction:
-          "You write premium TaskGoblin accountability reminders for Telegram. Write exactly one polished message of 70–110 words across 3–5 sentences. The message must address the supplied owner by name when present, repeat the exact task title, state the exact supplied deadline when present, and mention the supplied current Singapore time so the urgency is concrete. Include the task status, priority, or blocker when useful. End by asking for one concrete response: completion, current progress plus next step, or the blocker plus help needed. Sound theatrical, eerie, sinister, witty, and mischievous—as if an ancient goblin ledger is tracking unfinished work. Make it impressive, not a vague one-line flourish. Never invent an owner, deadline, progress, or time remaining. No markdown, headings, quotation wrappers, violence, harm, hate, humiliation, profanity, coercion, or genuine threats.",
-        candidateCount: 1,
-        maxOutputTokens: 500,
+      max_output_tokens: 500,
+      text: {
+        verbosity: "low",
       },
     });
 
-    const message = response.text?.trim();
-    return message && isCompleteGoblinMessage(message, task)
+    const message = response.output_text.trim();
+    return message && isCompleteAccountabilityMessage(message, task)
       ? message
       : createAccountabilityMessage(task, tone);
   } catch {
@@ -65,7 +87,7 @@ export function createAccountabilityMessage(
   return `🕯️ ${owner}, attend carefully: the Goblin has opened the ledger, and "${task.title}" is still marked ${task.status} with ${task.priority} priority. ${deadlineLine} This entry will not vanish merely because the page is left unread. Reply now with one clear truth: confirm it is complete, state the current progress and next step, or name the blocker and the help required.`;
 }
 
-function isCompleteGoblinMessage(message: string, task: TaskItem) {
+function isCompleteAccountabilityMessage(message: string, task: TaskItem) {
   const normalized = message.toLowerCase();
   const words = message.trim().split(/\s+/).length;
   const includesOwner = task.owner

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 import { createMockScanResult } from "@/lib/mock-scan";
 import type {
@@ -169,26 +169,41 @@ const TASK_SCAN_SCHEMA = {
   },
 };
 
+export const DEFAULT_OPENAI_SCAN_MODEL = "gpt-5.6-terra";
+
+type OpenAIScanOptions = {
+  apiKey?: string;
+  model?: string;
+  client?: OpenAI;
+};
+
 export async function scanTelegramImport(
-  telegramImport: NormalizedTelegramImport
+  telegramImport: NormalizedTelegramImport,
+  options: OpenAIScanOptions = {},
 ): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
-  return scanImport(telegramImport, "Telegram conversation");
+  return scanImport(telegramImport, "Telegram conversation", options);
 }
 
 export async function scanProjectBrief(
-  projectBrief: NormalizedTelegramImport
+  projectBrief: NormalizedTelegramImport,
+  options: OpenAIScanOptions = {},
 ): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
-  return scanImport(projectBrief, "project brief");
+  return scanImport(projectBrief, "project brief", options);
 }
 
 async function scanImport(
   telegramImport: NormalizedTelegramImport,
-  sourceKind: "Telegram conversation" | "project brief"
+  sourceKind: "Telegram conversation" | "project brief",
+  options: OpenAIScanOptions,
 ): Promise<{ result: TaskScanResult; usedMock: boolean; model: string }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+  const model =
+    options.model ??
+    process.env.OPENAI_SCAN_MODEL ??
+    process.env.OPENAI_EVENT_MODEL ??
+    DEFAULT_OPENAI_SCAN_MODEL;
 
-  if (!apiKey) {
+  if (!apiKey && !options.client) {
     return {
       result: createMockScanResult(telegramImport),
       usedMock: true,
@@ -196,27 +211,32 @@ async function scanImport(
     };
   }
 
-  const client = new GoogleGenAI({ apiKey });
+  const client = options.client ?? new OpenAI({ apiKey });
   const transcript = buildTranscript(telegramImport);
 
-  const response = await client.models.generateContent({
+  const response = await client.responses.create({
     model,
-    contents: `Source type: ${sourceKind}\nProject: ${telegramImport.chatName}\nParticipants: ${telegramImport.participants
+    store: false,
+    reasoning: { effort: "none" },
+    instructions:
+      `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Break every deliverable into 2–7 concrete, independently completable subtasks. Each subtask must begin with a specific action verb and describe one observable output. Never return vague subtasks such as “Work on database” or “Handle Telegram”; prefer “Create SQL tables for users and tasks”, “Implement GET query for task rows”, and “Register the Telegram /start command”. Keep parent task titles outcome-focused and subtasks implementation-specific. Goblin tone may be playful, but never cruel.`,
+    input: `Source type: ${sourceKind}\nProject: ${telegramImport.chatName}\nParticipants: ${telegramImport.participants
       .map((participant) => participant.name)
       .join(", ") || "Not explicitly listed"}\n\nSource content:\n${transcript}`,
-    config: {
-      systemInstruction:
-        `You are TaskGoblin, an AI project manager. Extract only facts supported by the supplied ${sourceKind}. Do not invent owners or deadlines. Use null where unknown. Treat headings, deliverables, milestones, responsibilities, dependencies, and success criteria as project context. Break every deliverable into 2–7 concrete, independently completable subtasks. Each subtask must begin with a specific action verb and describe one observable output. Never return vague subtasks such as “Work on database” or “Handle Telegram”; prefer “Create SQL tables for users and tasks”, “Implement GET query for task rows”, and “Register the Telegram /start command”. Keep parent task titles outcome-focused and subtasks implementation-specific. Goblin tone may be playful, but never cruel.`,
-      responseMimeType: "application/json",
-      responseJsonSchema: TASK_SCAN_SCHEMA.schema,
+    text: {
+      format: {
+        type: "json_schema",
+        ...TASK_SCAN_SCHEMA,
+      },
     },
   });
 
-  const text = response.text;
-  if (!text) throw new Error("Gemini returned an empty task scan.");
+  if (!response.output_text) {
+    throw new Error("OpenAI returned an empty task scan.");
+  }
 
   return {
-    result: JSON.parse(text) as TaskScanResult,
+    result: JSON.parse(response.output_text) as TaskScanResult,
     usedMock: false,
     model,
   };

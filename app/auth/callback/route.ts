@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!code || !url || !anonKey) {
-    return NextResponse.redirect(new URL("/?authError=missing_callback_config", requestUrl.origin));
+    return NextResponse.redirect(new URL("/legacy?authError=missing_callback_config", requestUrl.origin));
   }
 
   const supabase = createServerClient(url, anonKey, {
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    const errorUrl = new URL("/", requestUrl.origin);
+    const errorUrl = new URL("/legacy", requestUrl.origin);
     errorUrl.searchParams.set("authError", error.message);
     return NextResponse.redirect(errorUrl);
   }

@@ -14,12 +14,12 @@
     "test:evaluate:openai": "node scripts/run-openai-event-eval.mjs"
   },
   "dependencies": {
-    "@google/genai": "^2.11.0",
     "@napi-rs/canvas": "^0.1.80",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jose": "6.2.4",
     "jszip": "^3.10.1",
     "lucide-react": "^1.22.0",
     "mammoth": "1.12.0",

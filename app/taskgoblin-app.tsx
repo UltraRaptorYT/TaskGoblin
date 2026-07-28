@@ -202,7 +202,7 @@ export default function TaskGoblinApp({
       setImportStatus(
         `${payload.normalized.chatName}: ${payload.normalized.messageCount} source sections${isTelegramExport ? `, ${payload.normalized.participantCount} participants` : ""}. ${
           payload.persisted ? "Saved to Supabase." : "Running in demo mode."
-        } ${payload.usedMock ? "Mock scan used." : "Gemini scan used."}`,
+        } ${payload.usedMock ? "Mock scan used." : "OpenAI scan used."}`,
       );
     } catch (error) {
       setImportStatus(error instanceof Error ? error.message : "Import failed.");
@@ -317,7 +317,9 @@ export default function TaskGoblinApp({
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/legacy`,
+      },
     });
     if (error) setAuthMessage(error.message);
   }

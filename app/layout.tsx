@@ -14,16 +14,16 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "TaskGoblin — Turn project chaos into action",
+    default: "TaskGoblin — Project management from Telegram",
     template: "%s · TaskGoblin",
   },
   description:
-    "Upload a project brief or Telegram export and turn scattered context into clear tasks, owners, deadlines, risks, and timely nudges.",
+    "Turn Telegram project conversations into reviewable tasks, owners, deadlines, decisions, and timely nudges.",
   applicationName: "TaskGoblin",
   keywords: [
     "AI project management",
     "Telegram task extraction",
-    "project brief analyzer",
+    "Telegram project manager",
     "team accountability",
     "task board",
   ],
@@ -35,16 +35,16 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    title: "TaskGoblin — Turn project chaos into action",
+    title: "TaskGoblin — Project management from Telegram",
     description:
-      "Turn project briefs and team conversations into accountable work in one scan.",
+      "Turn Telegram project conversations into clear, accountable work.",
     siteName: "TaskGoblin",
   },
   twitter: {
     card: "summary",
-    title: "TaskGoblin — Turn project chaos into action",
+    title: "TaskGoblin — Project management from Telegram",
     description:
-      "Turn project briefs and team conversations into accountable work in one scan.",
+      "Turn Telegram project conversations into clear, accountable work.",
   },
 };
 

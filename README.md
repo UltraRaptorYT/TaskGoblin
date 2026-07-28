@@ -34,6 +34,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_EVENT_MODEL=gpt-5.6-sol
+OPENAI_SCAN_MODEL=gpt-5.6-terra
+OPENAI_REMINDER_MODEL=gpt-5.6-luna
 TELEGRAM_EVENT_DETECTION_MODE=openai
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEBHOOK_SECRET=
@@ -111,6 +113,13 @@ forcing OpenAI mode, for the deterministic development detector. The mock
 detector uses no provider calls and is evaluated against the held-out fixture
 set with `npm run test:evaluate`. With a provider key configured, run
 `npm run test:evaluate:openai` to measure the real Structured Outputs path.
+
+OpenAI is also the single provider for legacy import scans and generated
+reminders. The defaults are role-specific: Sol for high-signal Telegram event
+detection, Terra for document/chat extraction, and Luna for short reminder
+copy. Override them independently with `OPENAI_EVENT_MODEL`,
+`OPENAI_SCAN_MODEL`, and `OPENAI_REMINDER_MODEL`. Import scanning falls back to
+the mock scanner without a key; reminders fall back to deterministic templates.
 
 The model can propose task creation, assignment, progress, completion,
 deadline, blocker and decision events. Application code validates owner
