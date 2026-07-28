@@ -137,12 +137,29 @@ set with `npm run test:evaluate`. With a provider key configured, run
 `npm run test:evaluate:openai` to measure the real Structured Outputs path.
 
 Set `TELEGRAM_PROJECT_AGENT_MODE=openai` to answer project questions through a
-bounded OpenAI tool loop. In groups, the agent responds when TaskGoblin is
+bounded OpenAI tool call. In groups, the agent responds when TaskGoblin is
 mentioned or replied to, and to clear project-planning requests such as "what
-else needs to be done?" It can read confirmed tasks, members, recent chat, and
-extracted project documents. Its tools are read-only; project state changes
-continue through the candidate confirmation flow. If the agent mode is omitted,
-it inherits `TELEGRAM_EVENT_DETECTION_MODE`.
+else needs to be done?" It receives confirmed tasks, members, recent chat, and
+extracted project documents in one compact request, avoiding the previous
+mandatory second model round.
+
+When a planning request contains several uncovered deliverables, TaskGoblin
+persists each one as a separate task candidate and shows **Create all** and
+**Ignore all** controls. A confirmed batch creates every listed task. Likely
+duplicates are left out, usernames are resolved only against known group
+members, and deadline text must come from the current Telegram message.
+
+For generic project names such as `DEMO`, the agent can also suggest a more
+specific name when that name appears in the stored project context. The
+suggestion is persisted and requires a Telegram confirmation before the
+website is updated. Agent responses and group onboarding include a project
+dashboard link when `TASKGOBLIN_APP_URL` is configured.
+
+Apply
+`supabase/migrations/20260728132307_telegram_agent_task_batches.sql` before
+deploying this code. It removes the one-candidate-per-message restriction, adds
+transactional batch review, and adds reviewable project-name candidates. If the
+agent mode is omitted, it inherits `TELEGRAM_EVENT_DETECTION_MODE`.
 
 OpenAI is also the single provider for legacy import scans and generated
 reminders. The defaults are role-specific: Sol for high-signal Telegram event

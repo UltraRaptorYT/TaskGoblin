@@ -3,8 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ProjectDetectionContext } from "@/lib/project-event-detection";
 import {
+  isGenericProjectName,
   runTelegramProjectAgent,
   shouldInvokeTelegramProjectAgent,
+  validateAgentProjectNameProposal,
+  validateAgentTaskProposals,
 } from "@/lib/telegram-project-agent";
 import type { TelegramProjectRow } from "@/lib/telegram-repository";
 import type { TelegramInboundMessage } from "@/lib/taskgoblin-types";
@@ -107,43 +110,43 @@ describe("Telegram project agent intent routing", () => {
 });
 
 describe("runTelegramProjectAgent", () => {
-  it("executes read-only project tools and returns the final grounded answer", async () => {
-    const create = vi
-      .fn()
-      .mockResolvedValueOnce({
-        output: [
-          {
-            id: "fc-1",
-            call_id: "call-1",
-            type: "function_call",
-            name: "get_project_documents",
-            arguments: "{}",
-            status: "completed",
-          },
-          {
-            id: "fc-2",
-            call_id: "call-2",
-            type: "function_call",
-            name: "get_project_tasks",
-            arguments: "{}",
-            status: "completed",
-          },
-        ],
-        output_text: "",
-      })
-      .mockResolvedValueOnce({
-        output: [
-          {
-            id: "message-1",
-            type: "message",
-            role: "assistant",
-            status: "completed",
-            content: [],
-          },
-        ],
-        output_text:
-          "The report and demonstration are not covered yet.\n\n1. Write the project report\n2. Prepare the final demonstration",
-      });
+  it("returns a strict task batch from one grounded model call", async () => {
+    const create = vi.fn().mockResolvedValue({
+      output: [
+        {
+          id: "fc-1",
+          call_id: "call-1",
+          type: "function_call",
+          name: "respond_to_project_request",
+          arguments: JSON.stringify({
+            responseText: "I found two uncovered deliverables.",
+            proposals: [
+              {
+                title: "Write the project report",
+                description: "Document the implementation and findings.",
+                ownerUsername: null,
+                deadlineText: null,
+                confidence: 0.92,
+                rationale: "The assignment requires a report.",
+              },
+              {
+                title: "Prepare the final demonstration",
+                description: null,
+                ownerUsername: "UltraRaptor",
+                deadlineText: null,
+                confidence: 0.88,
+                rationale: "The assignment requires a demonstration.",
+              },
+            ],
+            proposedProjectName: null,
+            projectNameEvidence: null,
+            projectNameConfidence: null,
+          }),
+          status: "completed",
+        },
+      ],
+      output_text: "",
+    });
     const client = {
       responses: { create },
     } as unknown as OpenAI;
@@ -158,24 +161,19 @@ describe("runTelegramProjectAgent", () => {
       provider: "openai",
       model: "test-agent-model",
       fallback: false,
-      toolsUsed: ["get_project_documents", "get_project_tasks"],
+      toolsUsed: ["respond_to_project_request"],
     });
-    expect(result.text).toContain("Write the project report");
-    expect(create).toHaveBeenCalledTimes(2);
-    expect(create.mock.calls[1][0].input).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: "function_call_output",
-          call_id: "call-1",
-          output: expect.stringContaining("assignment.pdf"),
-        }),
-        expect.objectContaining({
-          type: "function_call_output",
-          call_id: "call-2",
-          output: expect.stringContaining("Build the backend"),
-        }),
-      ]),
-    );
+    expect(result.plan.proposals).toHaveLength(2);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toMatchObject({
+      parallel_tool_calls: false,
+      tool_choice: {
+        type: "function",
+        name: "respond_to_project_request",
+      },
+    });
+    expect(create.mock.calls[0][0].input).toContain("assignment.pdf");
+    expect(create.mock.calls[0][0].input).toContain("Build the backend");
   });
 
   it("uses deterministic project context when provider access is unavailable", async () => {
@@ -186,5 +184,86 @@ describe("runTelegramProjectAgent", () => {
     expect(result.provider).toBe("mock");
     expect(result.text).toContain("1 active confirmed task");
     expect(result.text).toContain("Build the backend");
+  });
+});
+
+describe("Telegram project agent safeguards", () => {
+  it("filters duplicate tasks and resolves owners only from known members", () => {
+    const validated = validateAgentTaskProposals(
+      {
+        responseText: "Suggested work",
+        proposals: [
+          {
+            title: "Build the backend",
+            description: null,
+            ownerUsername: "made_up_user",
+            deadlineText: null,
+            confidence: 0.95,
+            rationale: "Already covered.",
+          },
+          {
+            title: "Prepare the final demonstration",
+            description: null,
+            ownerUsername: "UltraRaptor",
+            deadlineText: null,
+            confidence: 0.9,
+            rationale: "Required by the assignment.",
+          },
+        ],
+        projectNameProposal: null,
+      },
+      message,
+      context,
+    );
+
+    expect(validated.duplicateCount).toBe(1);
+    expect(validated.accepted).toEqual([
+      expect.objectContaining({
+        title: "Prepare the final demonstration",
+        ownerTelegramUserRecordId: "member-1",
+      }),
+    ]);
+  });
+
+  it("only accepts strongly evidenced names for generic projects", () => {
+    const genericProject = { ...project, name: "DEMO" };
+    const namedContext = {
+      ...context,
+      documents: [
+        {
+          filename: "brief.pdf",
+          extractedText: "Project name: Taxi Data Analytics",
+        },
+      ],
+    };
+
+    expect(isGenericProjectName("DEMO")).toBe(true);
+    expect(isGenericProjectName("Taskgoblin *chat data")).toBe(true);
+    expect(
+      validateAgentProjectNameProposal(
+        {
+          name: "Taxi Data Analytics",
+          evidence: "Project name: Taxi Data Analytics",
+          confidence: 0.96,
+        },
+        genericProject,
+        message,
+        namedContext,
+      ),
+    ).toEqual(
+      expect.objectContaining({ name: "Taxi Data Analytics" }),
+    );
+    expect(
+      validateAgentProjectNameProposal(
+        {
+          name: "Invented Project",
+          evidence: "Project name: Taxi Data Analytics",
+          confidence: 0.99,
+        },
+        genericProject,
+        message,
+        namedContext,
+      ),
+    ).toBeNull();
   });
 });

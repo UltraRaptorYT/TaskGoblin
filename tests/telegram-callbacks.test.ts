@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  candidateBatchCallbackData,
   candidateCallbackData,
+  parseCandidateBatchCallbackData,
   parseCandidateCallbackData,
   parseProjectEventCandidateCallbackData,
+  parseProjectNameCallbackData,
   parseTaskViewCallbackData,
   projectEventCandidateCallbackData,
+  projectNameCallbackData,
   taskViewCallbackData,
 } from "@/lib/telegram-callbacks";
 import {
+  handleCandidateBatchCallback,
   handleCandidateCallback,
   handleProjectEventCandidateCallback,
+  handleProjectNameCallback,
   handleTaskViewCallback,
 } from "@/lib/telegram-handler";
 import type { TelegramInboundCallback } from "@/lib/taskgoblin-types";
@@ -42,6 +48,21 @@ describe("candidate callbacks", () => {
     const value = taskViewCallbackData("task-1");
     expect(parseTaskViewCallbackData(value)).toEqual({ taskId: "task-1" });
     expect(parseTaskViewCallbackData("tg:t:v:bad task")).toBeNull();
+  });
+
+  it("round-trips batch and project-name review callbacks", () => {
+    const batch = candidateBatchCallbackData("confirm", candidateId);
+    const projectName = projectNameCallbackData("ignore", candidateId);
+
+    expect(parseCandidateBatchCallbackData(batch)).toEqual({
+      action: "confirm",
+      batchId: candidateId,
+    });
+    expect(parseProjectNameCallbackData(projectName)).toEqual({
+      action: "ignore",
+      candidateId,
+    });
+    expect(parseCandidateCallbackData(batch)).toBeNull();
   });
 
   it("reviews the candidate, acknowledges Telegram, and clears the keyboard", async () => {
@@ -208,5 +229,99 @@ describe("candidate callbacks", () => {
       expect.stringMatching(/Website Launch[\s\S]*Status: doing/),
     );
     expect(result).toMatchObject({ handled: true, replySent: true });
+  });
+
+  it("creates every task in a confirmed agent batch", async () => {
+    const update: TelegramInboundCallback = {
+      kind: "callback_query",
+      updateId: 13,
+      updateType: "callback_query",
+      callbackQueryId: "callback-13",
+      data: candidateBatchCallbackData("confirm", candidateId),
+      chat: { id: -100, type: "supergroup", title: "Project", username: null },
+      actor: {
+        id: 42,
+        isBot: false,
+        firstName: "Alex",
+        lastName: null,
+        username: "alex",
+        languageCode: null,
+      },
+      messageId: 102,
+      raw: {},
+    };
+    const answerCallback = vi.fn().mockResolvedValue({ sent: true });
+    const clearKeyboard = vi.fn().mockResolvedValue({ sent: true });
+    const sendMessage = vi.fn().mockResolvedValue({ sent: true });
+    const reviewBatch = vi.fn().mockResolvedValue({
+      batchId: candidateId,
+      state: "confirmed",
+      taskIds: ["task-1", "task-2"],
+      titles: ["Write the report", "Prepare the demo"],
+    });
+
+    const result = await handleCandidateBatchCallback(
+      update,
+      {
+        chatRecordId: "chat-1",
+        userRecordId: "user-1",
+        projectId: "project-1",
+        displayName: "Alex",
+      },
+      { answerCallback, clearKeyboard, sendMessage, reviewBatch },
+    );
+
+    expect(reviewBatch).toHaveBeenCalledWith(candidateId, "confirm");
+    expect(sendMessage).toHaveBeenCalledWith(
+      -100,
+      expect.stringMatching(/Created 2 separate tasks[\s\S]*Prepare the demo/),
+    );
+    expect(result).toMatchObject({ handled: true, replySent: true });
+  });
+
+  it("renames a project only after a confirmation callback", async () => {
+    const update: TelegramInboundCallback = {
+      kind: "callback_query",
+      updateId: 14,
+      updateType: "callback_query",
+      callbackQueryId: "callback-14",
+      data: projectNameCallbackData("confirm", candidateId),
+      chat: { id: -100, type: "supergroup", title: "Project", username: null },
+      actor: {
+        id: 42,
+        isBot: false,
+        firstName: "Alex",
+        lastName: null,
+        username: "alex",
+        languageCode: null,
+      },
+      messageId: 103,
+      raw: {},
+    };
+    const answerCallback = vi.fn().mockResolvedValue({ sent: true });
+    const clearKeyboard = vi.fn().mockResolvedValue({ sent: true });
+    const sendMessage = vi.fn().mockResolvedValue({ sent: true });
+    const reviewCandidate = vi.fn().mockResolvedValue({
+      candidateId,
+      state: "confirmed",
+      projectName: "Taxi Data Analytics",
+    });
+
+    await handleProjectNameCallback(
+      update,
+      {
+        chatRecordId: "chat-1",
+        userRecordId: "user-1",
+        projectId: "project-1",
+        displayName: "Alex",
+      },
+      { answerCallback, clearKeyboard, sendMessage, reviewCandidate },
+    );
+
+    expect(reviewCandidate).toHaveBeenCalledWith(candidateId, "confirm");
+    expect(sendMessage).toHaveBeenCalledWith(
+      -100,
+      "Project renamed to Taxi Data Analytics. The website now uses this name.",
+    );
   });
 });

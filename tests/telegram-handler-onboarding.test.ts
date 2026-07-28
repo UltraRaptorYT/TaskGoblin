@@ -18,6 +18,8 @@ const repository = vi.hoisted(() => ({
   listTelegramUserTasks: vi.fn(),
   persistTelegramProjectDocument: vi.fn(),
   persistTelegramMessage: vi.fn(),
+  reviewAgentTaskCandidateBatch: vi.fn(),
+  reviewProjectNameCandidate: vi.fn(),
   reviewProjectEventCandidate: vi.fn(),
   reviewTaskCandidate: vi.fn(),
   updatePersistedTelegramMessageText: vi.fn(),
@@ -71,6 +73,7 @@ describe("processTelegramUpdate onboarding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.TELEGRAM_BOT_USERNAME = "taskgoblin_launch_bot";
+    process.env.TASKGOBLIN_APP_URL = "https://taskgoblin.vercel.app";
     repository.claimTelegramUpdate.mockResolvedValue(true);
     repository.ensureTelegramContext.mockResolvedValue({
       chatRecordId: "chat-1",
@@ -89,6 +92,18 @@ describe("processTelegramUpdate onboarding", () => {
       text: "The report and demonstration still need to be planned.",
       toolsUsed: ["get_project_documents", "get_project_tasks"],
       fallback: false,
+      batchId: null,
+      projectNameCandidateId: null,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            {
+              text: "Open project dashboard",
+              url: "https://taskgoblin.vercel.app/dashboard/projects/project-1",
+            },
+          ],
+        ],
+      },
     });
     telegramDocument.extractTelegramDocument.mockResolvedValue({
       filename: "assignment.txt",
@@ -163,6 +178,12 @@ describe("processTelegramUpdate onboarding", () => {
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       -10,
       expect.stringContaining("Quick setup"),
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      expect.stringContaining(
+        "https://taskgoblin.vercel.app/dashboard/projects/project-1",
+      ),
     );
     expect(repository.persistTelegramMessage).not.toHaveBeenCalled();
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
@@ -257,12 +278,18 @@ describe("processTelegramUpdate onboarding", () => {
     ).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ projectId: "project-1" }),
+      { id: "message-1" },
       update,
     );
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       -10,
       expect.stringContaining("report and demonstration"),
-      { replyToMessageId: 2 },
+      expect.objectContaining({
+        replyToMessageId: 2,
+        replyMarkup: expect.objectContaining({
+          inline_keyboard: expect.any(Array),
+        }),
+      }),
     );
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
   });

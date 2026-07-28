@@ -3,6 +3,7 @@ import type {
   TelegramChatType,
   TelegramInboundMessage,
 } from "@/lib/taskgoblin-types";
+import { telegramProjectDashboardUrl } from "@/lib/telegram-links";
 import type { TelegramContext } from "@/lib/telegram-repository";
 
 const GROUP_CHAT_TYPES = new Set<TelegramChatType>(["group", "supergroup"]);
@@ -24,7 +25,11 @@ export function telegramOnboardingReply(
     configuredBotToken,
   );
   if (joinedBot) {
-    return telegramBotAddedReply(joinedBot, configuredBotUsername);
+    return telegramBotAddedReply(
+      joinedBot,
+      configuredBotUsername,
+      context.projectId,
+    );
   }
 
   if (
@@ -56,10 +61,11 @@ export function telegramOnboardingReply(
 export function telegramBotAddedReply(
   bot: TelegramActor,
   configuredBotUsername?: string,
+  projectId?: string | null,
 ) {
   const botUsername =
     normalizeUsername(bot.username) ?? normalizeUsername(configuredBotUsername);
-  return welcomeMessage(botUsername);
+  return welcomeMessage(botUsername, projectId);
 }
 
 function findJoinedTaskGoblin(
@@ -77,11 +83,11 @@ function findJoinedTaskGoblin(
   );
 }
 
-function welcomeMessage(botUsername: string | null) {
+function welcomeMessage(botUsername: string | null, projectId?: string | null) {
   const privateSetup = botUsername
     ? `2. Each member should open @${botUsername} privately and press Start once to receive private reminders.`
     : "2. Each member should open my private chat and press Start once to receive private reminders.";
-  return [
+  const lines = [
     "👋 Hello! I’m TaskGoblin, the AI project manager for this group.",
     "",
     "I can detect task proposals, assignments, deadlines, progress, blockers, completions, and decisions. I will ask for confirmation before changing project state.",
@@ -93,7 +99,14 @@ function welcomeMessage(botUsername: string | null) {
     "@alex please prepare the demo by Friday",
     "",
     "Use /help to see commands, /tasks for active work, and /mytasks for your assignments.",
-  ].join("\n");
+  ];
+  const dashboardUrl = projectId
+    ? telegramProjectDashboardUrl(projectId)
+    : null;
+  if (dashboardUrl) {
+    lines.push("", `Track this project on the web:\n${dashboardUrl}`);
+  }
+  return lines.join("\n");
 }
 
 function botIdFromToken(value: string | undefined) {

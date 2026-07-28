@@ -8,8 +8,10 @@ import {
   type TelegramSendOptions,
 } from "@/lib/telegram-bot";
 import {
+  parseCandidateBatchCallbackData,
   parseCandidateCallbackData,
   parseProjectEventCandidateCallbackData,
+  parseProjectNameCallbackData,
   parseTaskViewCallbackData,
   projectEventCandidateCallbackData,
   type CandidateCallbackAction,
@@ -41,12 +43,16 @@ import {
   listTelegramUserTasks,
   persistTelegramProjectDocument,
   persistTelegramMessage,
+  reviewAgentTaskCandidateBatch,
+  reviewProjectNameCandidate,
   reviewProjectEventCandidate,
   reviewTaskCandidate,
   updatePersistedTelegramMessageText,
+  type CandidateBatchReviewResult,
   type CandidateReviewResult,
   type PersistedProjectEventCandidate,
   type ProjectEventCandidateReviewResult,
+  type ProjectNameCandidateReviewResult,
   type TelegramContext,
   type TelegramUserTaskRow,
 } from "@/lib/telegram-repository";
@@ -107,6 +113,7 @@ export async function processTelegramUpdate(
         telegramBotAddedReply(
           update.bot,
           process.env.TELEGRAM_BOT_USERNAME,
+          context.projectId,
         ),
       );
       replySent = delivery.sent;
@@ -231,13 +238,17 @@ export async function processTelegramUpdate(
         const response = await answerTelegramProjectRequest(
           supabase,
           context,
+          persistedMessage,
           detectionMessage,
         );
         if (response) {
           const delivery = await gateway.sendMessage(
             update.chat.id,
             response.text,
-            { replyToMessageId: update.messageId },
+            {
+              replyToMessageId: update.messageId,
+              replyMarkup: response.replyMarkup,
+            },
           );
           replySent = delivery.sent;
         }
@@ -292,6 +303,8 @@ export async function processTelegramUpdate(
       }
     } else {
       const taskView = parseTaskViewCallbackData(update.data);
+      const taskBatch = parseCandidateBatchCallbackData(update.data);
+      const projectName = parseProjectNameCallbackData(update.data);
       const isProjectEvent = Boolean(
         parseProjectEventCandidateCallbackData(update.data),
       );
@@ -302,7 +315,33 @@ export async function processTelegramUpdate(
             loadTask: (taskId) =>
               getTaskForTelegramContext(supabase, context, taskId),
           })
-        : isProjectEvent
+        : taskBatch
+          ? await handleCandidateBatchCallback(update, context, {
+              answerCallback: gateway.answerCallback,
+              clearKeyboard: gateway.clearKeyboard,
+              sendMessage: gateway.sendMessage,
+              reviewBatch: (batchId, action) =>
+                reviewAgentTaskCandidateBatch(
+                  supabase,
+                  context,
+                  batchId,
+                  action,
+                ),
+            })
+          : projectName
+            ? await handleProjectNameCallback(update, context, {
+                answerCallback: gateway.answerCallback,
+                clearKeyboard: gateway.clearKeyboard,
+                sendMessage: gateway.sendMessage,
+                reviewCandidate: (candidateId, action) =>
+                  reviewProjectNameCandidate(
+                    supabase,
+                    context,
+                    candidateId,
+                    action,
+                  ),
+              })
+            : isProjectEvent
           ? await handleProjectEventCandidateCallback(update, context, {
               answerCallback: gateway.answerCallback,
               clearKeyboard: gateway.clearKeyboard,
@@ -333,6 +372,121 @@ export async function processTelegramUpdate(
     await failTelegramUpdate(supabase, update.updateId, message);
     throw error;
   }
+}
+
+export type CandidateBatchCallbackDependencies = {
+  answerCallback: (
+    callbackQueryId: string,
+    text?: string,
+  ) => Promise<TelegramDelivery>;
+  clearKeyboard: (
+    chatId: string | number,
+    messageId: number,
+  ) => Promise<TelegramDelivery>;
+  sendMessage: (
+    chatId: string | number,
+    text: string,
+  ) => Promise<TelegramDelivery>;
+  reviewBatch: (
+    batchId: string,
+    action: "confirm" | "ignore",
+  ) => Promise<CandidateBatchReviewResult>;
+};
+
+export async function handleCandidateBatchCallback(
+  update: TelegramInboundCallback,
+  context: TelegramContext,
+  dependencies: CandidateBatchCallbackDependencies,
+) {
+  const callback = parseCandidateBatchCallbackData(update.data);
+  if (!callback || !update.chat || !context.projectId) {
+    await dependencies.answerCallback(
+      update.callbackQueryId,
+      "This task batch is invalid or expired.",
+    );
+    return { handled: false, replySent: false };
+  }
+
+  const reviewed = await dependencies.reviewBatch(
+    callback.batchId,
+    callback.action,
+  );
+  await dependencies.answerCallback(
+    update.callbackQueryId,
+    reviewed.state === "confirmed"
+      ? `${reviewed.titles.length} tasks created.`
+      : `${reviewed.titles.length} proposals ignored.`,
+  );
+  if (update.messageId) {
+    await dependencies.clearKeyboard(update.chat.id, update.messageId);
+  }
+  const delivery = await dependencies.sendMessage(
+    update.chat.id,
+    reviewed.state === "confirmed"
+      ? [
+          `Created ${reviewed.titles.length} separate tasks:`,
+          ...reviewed.titles.map(
+            (title, index) => `${index + 1}. ${title}`,
+          ),
+        ].join("\n")
+      : `Ignored ${reviewed.titles.length} task proposals.`,
+  );
+  return { handled: true, replySent: delivery.sent, review: reviewed };
+}
+
+export type ProjectNameCallbackDependencies = {
+  answerCallback: (
+    callbackQueryId: string,
+    text?: string,
+  ) => Promise<TelegramDelivery>;
+  clearKeyboard: (
+    chatId: string | number,
+    messageId: number,
+  ) => Promise<TelegramDelivery>;
+  sendMessage: (
+    chatId: string | number,
+    text: string,
+  ) => Promise<TelegramDelivery>;
+  reviewCandidate: (
+    candidateId: string,
+    action: "confirm" | "ignore",
+  ) => Promise<ProjectNameCandidateReviewResult>;
+};
+
+export async function handleProjectNameCallback(
+  update: TelegramInboundCallback,
+  context: TelegramContext,
+  dependencies: ProjectNameCallbackDependencies,
+) {
+  const callback = parseProjectNameCallbackData(update.data);
+  if (!callback || !update.chat || !context.projectId) {
+    await dependencies.answerCallback(
+      update.callbackQueryId,
+      "This project-name suggestion is invalid or expired.",
+    );
+    return { handled: false, replySent: false };
+  }
+
+  const reviewed = await dependencies.reviewCandidate(
+    callback.candidateId,
+    callback.action,
+  );
+  await dependencies.answerCallback(
+    update.callbackQueryId,
+    reviewed.state === "confirmed"
+      ? "Project name updated."
+      : "Project name kept.",
+  );
+  if (update.messageId) {
+    await dependencies.clearKeyboard(update.chat.id, update.messageId);
+  }
+  const delivery = await dependencies.sendMessage(
+    update.chat.id,
+    reviewed.state === "confirmed"
+      ? `Project renamed to ${reviewed.projectName}. The website now uses this name.`
+      : `Kept the current project name instead of ${reviewed.projectName}.`,
+  );
+  return { handled: true, replySent: delivery.sent, review: reviewed };
 }
 
 export type TaskViewCallbackDependencies = {

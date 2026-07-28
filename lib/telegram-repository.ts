@@ -27,11 +27,43 @@ export type TelegramContext = {
 export type PersistedTelegramMessage = { id: string };
 export type PersistedTaskCandidate = { id: string; title: string };
 
+export type AgentTaskCandidateInput = {
+  title: string;
+  description: string | null;
+  ownerTelegramUserRecordId: string | null;
+  dueLabel: string | null;
+  dueAt: string | null;
+  confidence: number;
+};
+
+export type PersistedTaskCandidateBatch = {
+  batchId: string;
+  candidates: PersistedTaskCandidate[];
+};
+
 export type CandidateReviewResult = {
   candidateId: string;
   state: "confirmed" | "edited" | "ignored";
   taskId: string | null;
   title: string;
+};
+
+export type CandidateBatchReviewResult = {
+  batchId: string;
+  state: "confirmed" | "ignored";
+  taskIds: string[];
+  titles: string[];
+};
+
+export type PersistedProjectNameCandidate = {
+  id: string;
+  proposedName: string;
+};
+
+export type ProjectNameCandidateReviewResult = {
+  candidateId: string;
+  state: "confirmed" | "ignored";
+  projectName: string;
 };
 
 export type ProjectEventCandidateReviewResult = {
@@ -264,6 +296,7 @@ export async function createTaskCandidate(
       {
         project_id: context.projectId,
         source_telegram_message_id: sourceMessage.id,
+        dedupe_key: sourceMessage.id,
         proposed_title: candidate.title,
         proposed_owner_telegram_user_id: candidate.assignToSender
           ? context.userRecordId
@@ -273,7 +306,7 @@ export async function createTaskCandidate(
         state: "detected",
       },
       {
-        onConflict: "source_telegram_message_id",
+        onConflict: "dedupe_key",
         ignoreDuplicates: true,
       },
     )
@@ -288,7 +321,7 @@ export async function createTaskCandidate(
   const { data: existing, error: existingError } = await supabase
     .from("taskgoblin_task_candidates")
     .select("id, proposed_title")
-    .eq("source_telegram_message_id", sourceMessage.id)
+    .eq("dedupe_key", sourceMessage.id)
     .single();
   if (existingError || !existing) {
     throw new Error(
@@ -299,6 +332,174 @@ export async function createTaskCandidate(
     id: existing.id as string,
     title: existing.proposed_title as string,
   };
+}
+
+export async function createAgentTaskCandidateBatch(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  sourceMessage: PersistedTelegramMessage,
+  proposals: AgentTaskCandidateInput[],
+): Promise<PersistedTaskCandidateBatch> {
+  if (!context.projectId) {
+    throw new Error("Cannot create an agent task batch without a project.");
+  }
+  if (proposals.length < 1 || proposals.length > 8) {
+    throw new Error("An agent task batch must contain between 1 and 8 tasks.");
+  }
+
+  const batchId = sourceMessage.id;
+  const { error } = await supabase
+    .from("taskgoblin_task_candidates")
+    .upsert(
+      proposals.map((proposal, index) => ({
+        project_id: context.projectId,
+        source_telegram_message_id: sourceMessage.id,
+        agent_batch_id: batchId,
+        proposal_index: index + 1,
+        dedupe_key: `${batchId}:agent:${index + 1}`,
+        proposed_title: proposal.title,
+        proposed_description: proposal.description,
+        proposed_owner_telegram_user_id:
+          proposal.ownerTelegramUserRecordId,
+        proposed_due_label: proposal.dueLabel,
+        proposed_due_at: proposal.dueAt,
+        confidence: proposal.confidence,
+        detection_source: "ai",
+        state: "detected",
+      })),
+      {
+        onConflict: "dedupe_key",
+        ignoreDuplicates: true,
+      },
+    )
+  if (error) {
+    throw new Error(
+      `Could not persist agent task candidates: ${error.message}`,
+    );
+  }
+
+  const { data, error: loadError } = await supabase
+    .from("taskgoblin_task_candidates")
+    .select("id, proposed_title, proposal_index")
+    .eq("agent_batch_id", batchId)
+    .order("proposal_index");
+  if (loadError || !data || data.length < 1) {
+    throw new Error(
+      `Could not load agent task candidates: ${loadError?.message ?? "Empty batch"}`,
+    );
+  }
+
+  return {
+    batchId,
+    candidates: data.map((row) => ({
+      id: row.id as string,
+      title: row.proposed_title as string,
+    })),
+  };
+}
+
+export async function queueAgentTaskCandidateBatch(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  batchId: string,
+) {
+  if (!context.projectId) throw new Error("Task candidate batch has no project.");
+  const { data, error } = await supabase.rpc(
+    "taskgoblin_transition_task_candidate_batch",
+    {
+      p_batch_id: batchId,
+      p_project_id: context.projectId,
+      p_action: "queue",
+      p_reviewer_telegram_user_id: null,
+    },
+  );
+  if (error || !Array.isArray(data) || data.length < 1) {
+    throw new Error(
+      `Could not queue task candidate batch: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+}
+
+export async function createProjectNameCandidate(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  sourceMessage: PersistedTelegramMessage,
+  input: {
+    originalName: string;
+    proposedName: string;
+    evidence: string;
+    confidence: number;
+  },
+): Promise<PersistedProjectNameCandidate> {
+  if (!context.projectId) {
+    throw new Error("Cannot suggest a project name without a project.");
+  }
+  const { data, error } = await supabase
+    .from("taskgoblin_project_name_candidates")
+    .upsert(
+      {
+        project_id: context.projectId,
+        source_telegram_message_id: sourceMessage.id,
+        original_name: input.originalName,
+        proposed_name: input.proposedName,
+        evidence: input.evidence,
+        confidence: input.confidence,
+        state: "detected",
+      },
+      {
+        onConflict: "source_telegram_message_id,proposed_name",
+        ignoreDuplicates: true,
+      },
+    )
+    .select("id, proposed_name")
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Could not persist project name candidate: ${error.message}`);
+  }
+
+  let row = data;
+  if (!row) {
+    const { data: existing, error: existingError } = await supabase
+      .from("taskgoblin_project_name_candidates")
+      .select("id, proposed_name")
+      .eq("source_telegram_message_id", sourceMessage.id)
+      .eq("proposed_name", input.proposedName)
+      .single();
+    if (existingError || !existing) {
+      throw new Error(
+        `Could not load project name candidate: ${existingError?.message ?? "Unknown error"}`,
+      );
+    }
+    row = existing;
+  }
+  return {
+    id: row.id as string,
+    proposedName: row.proposed_name as string,
+  };
+}
+
+export async function queueProjectNameCandidate(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  candidateId: string,
+) {
+  if (!context.projectId) {
+    throw new Error("Project name candidate has no project.");
+  }
+  const { data, error } = await supabase.rpc(
+    "taskgoblin_transition_project_name_candidate",
+    {
+      p_candidate_id: candidateId,
+      p_project_id: context.projectId,
+      p_action: "queue",
+      p_reviewer_telegram_user_id: null,
+    },
+  );
+  if (error || !Array.isArray(data) || data.length !== 1) {
+    throw new Error(
+      `Could not queue project name candidate: ${error?.message ?? "Unknown error"}`,
+    );
+  }
 }
 
 export async function loadProjectDetectionContext(
@@ -758,6 +959,75 @@ export async function reviewTaskCandidate(
     state: row.candidate_state,
     taskId: row.task_id,
     title: row.title,
+  };
+}
+
+export async function reviewAgentTaskCandidateBatch(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  batchId: string,
+  action: "confirm" | "ignore",
+): Promise<CandidateBatchReviewResult> {
+  if (!context.projectId) throw new Error("Task candidate batch has no project.");
+  const { data, error } = await supabase.rpc(
+    "taskgoblin_transition_task_candidate_batch",
+    {
+      p_batch_id: batchId,
+      p_project_id: context.projectId,
+      p_action: action,
+      p_reviewer_telegram_user_id: context.userRecordId,
+    },
+  );
+  if (error || !Array.isArray(data) || data.length < 1) {
+    throw new Error(
+      `Could not review task candidate batch: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+  const rows = data as Array<{
+    candidate_state: "confirmed" | "ignored";
+    task_id: string | null;
+    title: string;
+  }>;
+  return {
+    batchId,
+    state: rows[0].candidate_state,
+    taskIds: rows.flatMap((row) => (row.task_id ? [row.task_id] : [])),
+    titles: rows.map((row) => row.title),
+  };
+}
+
+export async function reviewProjectNameCandidate(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  candidateId: string,
+  action: "confirm" | "ignore",
+): Promise<ProjectNameCandidateReviewResult> {
+  if (!context.projectId) {
+    throw new Error("Project name candidate has no project.");
+  }
+  const { data, error } = await supabase.rpc(
+    "taskgoblin_transition_project_name_candidate",
+    {
+      p_candidate_id: candidateId,
+      p_project_id: context.projectId,
+      p_action: action,
+      p_reviewer_telegram_user_id: context.userRecordId,
+    },
+  );
+  if (error || !Array.isArray(data) || data.length !== 1) {
+    throw new Error(
+      `Could not review project name candidate: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+  const row = data[0] as {
+    candidate_id: string;
+    candidate_state: "confirmed" | "ignored";
+    project_name: string;
+  };
+  return {
+    candidateId: row.candidate_id,
+    state: row.candidate_state,
+    projectName: row.project_name,
   };
 }
 
