@@ -32,8 +32,50 @@ describe("normalizeTelegramUpdate", () => {
       title: "Launch",
     });
     expect(result.update.actor?.id).toBe(42);
+    expect(result.update.newChatMembers).toEqual([]);
     expect(result.update.replyToMessageId).toBe(10);
     expect(result.update.text).toBe("I will prepare the demo");
+  });
+
+  it("normalizes bot-added service messages", () => {
+    const result = normalizeTelegramUpdate({
+      update_id: 59,
+      message: {
+        message_id: 14,
+        date: 1_700_000_000,
+        chat: { id: -100123, type: "supergroup", title: "Launch" },
+        from: {
+          id: 42,
+          is_bot: false,
+          first_name: "Alex",
+          username: "alex",
+        },
+        new_chat_members: [
+          {
+            id: 99,
+            is_bot: true,
+            first_name: "TaskGoblin",
+            username: "taskgoblin_launch_bot",
+          },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || !result.update || result.update.kind !== "message") {
+      throw new Error("Expected a normalized service message");
+    }
+    expect(result.update.text).toBe("");
+    expect(result.update.newChatMembers).toEqual([
+      {
+        id: 99,
+        isBot: true,
+        firstName: "TaskGoblin",
+        lastName: null,
+        username: "taskgoblin_launch_bot",
+        languageCode: null,
+      },
+    ]);
   });
 
   it("normalizes edited captions and callback queries", () => {

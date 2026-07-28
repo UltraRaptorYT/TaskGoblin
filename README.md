@@ -80,11 +80,17 @@ https://YOUR_DEPLOYMENT/api/telegram/webhook
 Configure Telegram to send the secret in
 `X-Telegram-Bot-Api-Secret-Token`. The bot currently handles:
 
+- a group welcome when TaskGoblin is added
+- `hello` member identity acknowledgement
 - `/help`
 - `/summary`
 - `/tasks`
 - `/mytasks`
 - project-event Confirm, Edit and Ignore callbacks
+
+The welcome asks each team member to say `hello` in the group so TaskGoblin can
+link their Telegram identity to the project. Members must also open the bot
+privately and press Start once before Telegram will allow private reminders.
 
 Set `TELEGRAM_EVENT_DETECTION_MODE=openai` and provide `OPENAI_API_KEY` for
 OpenAI Structured Outputs. Set the mode to `mock`, or omit the key without

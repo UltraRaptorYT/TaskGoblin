@@ -23,6 +23,7 @@ const baseMessage: TelegramInboundMessage = {
     username: "alex",
     languageCode: "en",
   },
+  newChatMembers: [],
   replyToMessageId: null,
   messageThreadId: null,
   raw: {},

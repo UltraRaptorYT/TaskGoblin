@@ -123,6 +123,7 @@ function messageFor(testCase: FixtureCase): TelegramInboundMessage {
       username: testCase.senderUsername,
       languageCode: "en",
     },
+    newChatMembers: [],
     replyToMessageId: testCase.replyToMessageId ?? null,
     messageThreadId: null,
     raw: {},

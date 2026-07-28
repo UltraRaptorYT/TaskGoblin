@@ -34,6 +34,7 @@ const telegramMessageSchema = z.object({
   caption: z.string().optional(),
   chat: telegramChatSchema,
   from: telegramUserSchema.optional(),
+  new_chat_members: z.array(telegramUserSchema).optional(),
   reply_to_message: z
     .object({ message_id: z.number().int() })
     .passthrough()
@@ -114,6 +115,7 @@ export function normalizeTelegramUpdate(
       text: (message.text ?? message.caption ?? "").trim(),
       chat: normalizeChat(message.chat),
       actor: message.from ? normalizeActor(message.from) : null,
+      newChatMembers: (message.new_chat_members ?? []).map(normalizeActor),
       replyToMessageId: message.reply_to_message?.message_id ?? null,
       messageThreadId: message.message_thread_id ?? null,
       raw: payload,

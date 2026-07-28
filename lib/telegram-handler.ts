@@ -35,6 +35,7 @@ import {
   type TelegramTaskRow,
 } from "@/lib/telegram-repository";
 import { detectAndPersistProjectEvent } from "@/lib/telegram-event-pipeline";
+import { telegramOnboardingReply } from "@/lib/telegram-onboarding";
 import type {
   TelegramInboundCallback,
   TelegramInboundUpdate,
@@ -84,8 +85,22 @@ export async function processTelegramUpdate(
         update.text,
         process.env.TELEGRAM_BOT_USERNAME,
       );
+      const onboardingReply = telegramOnboardingReply(
+        update,
+        context,
+        process.env.TELEGRAM_BOT_USERNAME,
+      );
 
-      if (command) {
+      if (onboardingReply) {
+        const delivery = await gateway.sendMessage(
+          update.chat.id,
+          onboardingReply,
+          {
+            replyToMessageId: update.messageId,
+          },
+        );
+        replySent = delivery.sent;
+      } else if (command) {
         const response = await routeTelegramCommand(
           supabase,
           command.name,

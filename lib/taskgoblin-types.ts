@@ -160,6 +160,7 @@ export type TelegramInboundMessage = {
   text: string;
   chat: TelegramChat;
   actor: TelegramActor | null;
+  newChatMembers: TelegramActor[];
   replyToMessageId: number | null;
   messageThreadId: number | null;
   raw: unknown;
