@@ -59,12 +59,14 @@ export default async function DashboardPage() {
           <div>
             <p className="text-xs font-semibold text-[#91a096]">Connected as</p>
             <p className="text-sm font-black">
-              {identity.username ? `@${identity.username}` : identity.displayName}
+              {identity.username
+                ? `@${identity.username}`
+                : identity.displayName}
             </p>
           </div>
         </div>
       </section>
-
+      {/*
       <section className="grid gap-4 border-b border-white/10 py-7 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
           <p className="text-xs font-black uppercase tracking-[.14em] text-[#dfff64]">
@@ -91,7 +93,7 @@ export default async function DashboardPage() {
           </span>
           <ArrowUpRight className="size-4 text-[#91a096]" />
         </Link>
-      </section>
+      </section> */}
 
       <section
         className="grid gap-3 py-7 sm:grid-cols-2 lg:grid-cols-4"
@@ -129,11 +131,15 @@ export default async function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold text-[#aabbb0]">{label}</p>
-              <span className={`grid size-9 place-items-center rounded-xl ${accent}`}>
+              <span
+                className={`grid size-9 place-items-center rounded-xl ${accent}`}
+              >
                 <Icon className="size-4" />
               </span>
             </div>
-            <p className="mt-5 text-3xl font-black tracking-[-.04em]">{value}</p>
+            <p className="mt-5 text-3xl font-black tracking-[-.04em]">
+              {value}
+            </p>
           </div>
         ))}
       </section>

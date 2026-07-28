@@ -64,7 +64,15 @@ async function extractPdfText(buffer: Buffer) {
   geometryGlobals.ImageData ??= canvas.ImageData;
   geometryGlobals.Path2D ??= canvas.Path2D;
 
+  // Vercel only traces files it can resolve statically. PDF.js otherwise tries
+  // to load pdf.worker.mjs from node_modules at runtime, which is not guaranteed
+  // to exist in the deployed function. pdf-parse ships the worker as an embedded
+  // data URL specifically for serverless environments, so configure it before
+  // creating the parser.
+  const { getData } = await import("pdf-parse/worker");
   const { PDFParse } = await import("pdf-parse");
+  PDFParse.setWorker(getData());
+
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
 
   try {
