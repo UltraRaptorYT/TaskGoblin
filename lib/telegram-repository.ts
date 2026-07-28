@@ -58,11 +58,30 @@ export type PersistedProjectEventCandidate = {
 
 export type TelegramTaskRow = {
   id: string;
+  project_id: string;
   title: string;
+  description: string | null;
   status: string;
+  priority: string;
   source_participant_name: string | null;
   due_label: string | null;
+  due_at: string | null;
+  blocked_by: string | null;
   owner_telegram_user_id: string | null;
+  updated_at: string;
+};
+
+export type TelegramProjectRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  health_score: number;
+  health_label: string;
+  timezone: string;
+};
+
+export type TelegramUserTaskRow = TelegramTaskRow & {
+  project_name: string;
 };
 
 export async function claimTelegramUpdate(
@@ -675,13 +694,120 @@ export async function listProjectTasks(
   const { data, error } = await supabase
     .from("taskgoblin_tasks")
     .select(
-      "id, title, status, source_participant_name, due_label, owner_telegram_user_id",
+      "id, project_id, title, description, status, priority, source_participant_name, due_label, due_at, blocked_by, owner_telegram_user_id, updated_at",
     )
     .eq("project_id", projectId)
     .order("created_at", { ascending: true })
-    .limit(50);
+    .limit(100);
   if (error) throw new Error(`Could not load project tasks: ${error.message}`);
   return (data ?? []) as TelegramTaskRow[];
+}
+
+export async function getTelegramProject(
+  supabase: SupabaseClient,
+  projectId: string,
+): Promise<TelegramProjectRow> {
+  const { data, error } = await supabase
+    .from("taskgoblin_projects")
+    .select("id, name, description, health_score, health_label, timezone")
+    .eq("id", projectId)
+    .single();
+  if (error || !data) {
+    throw new Error(
+      `Could not load Telegram project: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    description: (data.description as string | null) ?? null,
+    health_score: Number(data.health_score),
+    health_label: data.health_label as string,
+    timezone: (data.timezone as string | null) ?? "UTC",
+  };
+}
+
+export async function listTelegramUserTasks(
+  supabase: SupabaseClient,
+  telegramUserRecordId: string,
+): Promise<TelegramUserTaskRow[]> {
+  const { data: taskRows, error: taskError } = await supabase
+    .from("taskgoblin_tasks")
+    .select(
+      "id, project_id, title, description, status, priority, source_participant_name, due_label, due_at, blocked_by, owner_telegram_user_id, updated_at",
+    )
+    .eq("owner_telegram_user_id", telegramUserRecordId)
+    .order("updated_at", { ascending: false })
+    .limit(200);
+  if (taskError) {
+    throw new Error(`Could not load Telegram user tasks: ${taskError.message}`);
+  }
+
+  const projectIds = [
+    ...new Set((taskRows ?? []).map((row) => row.project_id as string)),
+  ];
+  if (!projectIds.length) return [];
+
+  const { data: projectRows, error: projectError } = await supabase
+    .from("taskgoblin_projects")
+    .select("id, name")
+    .in("id", projectIds);
+  if (projectError) {
+    throw new Error(
+      `Could not load Telegram user task projects: ${projectError.message}`,
+    );
+  }
+  const projectNames = new Map(
+    (projectRows ?? []).map((row) => [
+      row.id as string,
+      row.name as string,
+    ]),
+  );
+
+  return (taskRows ?? []).map((row) => ({
+    ...(row as TelegramTaskRow),
+    project_name:
+      projectNames.get(row.project_id as string) ?? "Unknown project",
+  }));
+}
+
+export async function getTaskForTelegramContext(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  taskId: string,
+): Promise<TelegramUserTaskRow | null> {
+  if (!context.projectId && !context.userRecordId) return null;
+
+  let query = supabase
+    .from("taskgoblin_tasks")
+    .select(
+      "id, project_id, title, description, status, priority, source_participant_name, due_label, due_at, blocked_by, owner_telegram_user_id, updated_at",
+    )
+    .eq("id", taskId);
+  query = context.projectId
+    ? query.eq("project_id", context.projectId)
+    : query.eq("owner_telegram_user_id", context.userRecordId!);
+
+  const { data: task, error: taskError } = await query.maybeSingle();
+  if (taskError) {
+    throw new Error(`Could not load Telegram task: ${taskError.message}`);
+  }
+  if (!task) return null;
+
+  const { data: project, error: projectError } = await supabase
+    .from("taskgoblin_projects")
+    .select("name")
+    .eq("id", task.project_id)
+    .single();
+  if (projectError || !project) {
+    throw new Error(
+      `Could not load Telegram task project: ${projectError?.message ?? "Unknown error"}`,
+    );
+  }
+  return {
+    ...(task as TelegramTaskRow),
+    project_name: project.name as string,
+  };
 }
 
 export async function completeTelegramUpdate(

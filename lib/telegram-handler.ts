@@ -10,9 +10,20 @@ import {
 import {
   parseCandidateCallbackData,
   parseProjectEventCandidateCallbackData,
+  parseTaskViewCallbackData,
   projectEventCandidateCallbackData,
   type CandidateCallbackAction,
 } from "@/lib/telegram-callbacks";
+import {
+  groupMyTasksResponse,
+  kpiResponse,
+  privateMyTasksResponse,
+  projectResponse,
+  summaryResponse,
+  taskDetailMessage,
+  tasksResponse,
+  type TelegramCommandResponse,
+} from "@/lib/telegram-command-responses";
 import {
   helpMessage,
   isTelegramCommandLike,
@@ -24,7 +35,10 @@ import {
   completeTelegramUpdate,
   ensureTelegramContext,
   failTelegramUpdate,
+  getTaskForTelegramContext,
+  getTelegramProject,
   listProjectTasks,
+  listTelegramUserTasks,
   persistTelegramMessage,
   reviewProjectEventCandidate,
   reviewTaskCandidate,
@@ -32,7 +46,7 @@ import {
   type PersistedProjectEventCandidate,
   type ProjectEventCandidateReviewResult,
   type TelegramContext,
-  type TelegramTaskRow,
+  type TelegramUserTaskRow,
 } from "@/lib/telegram-repository";
 import { detectAndPersistProjectEvent } from "@/lib/telegram-event-pipeline";
 import { telegramOnboardingReply } from "@/lib/telegram-onboarding";
@@ -105,10 +119,16 @@ export async function processTelegramUpdate(
           supabase,
           command.name,
           context,
+          update.chat.type === "private",
         );
-        const delivery = await gateway.sendMessage(update.chat.id, response, {
-          replyToMessageId: update.messageId,
-        });
+        const delivery = await gateway.sendMessage(
+          update.chat.id,
+          response.text,
+          {
+            replyToMessageId: update.messageId,
+            replyMarkup: response.replyMarkup,
+          },
+        );
         replySent = delivery.sent;
       } else if (!isTelegramCommandLike(update.text) && context.projectId) {
         const candidate = await detectAndPersistProjectEvent(
@@ -156,29 +176,37 @@ export async function processTelegramUpdate(
         }
       }
     } else {
+      const taskView = parseTaskViewCallbackData(update.data);
       const isProjectEvent = Boolean(
         parseProjectEventCandidateCallbackData(update.data),
       );
-      const result = isProjectEvent
-        ? await handleProjectEventCandidateCallback(update, context, {
+      const result = taskView
+        ? await handleTaskViewCallback(update, context, {
             answerCallback: gateway.answerCallback,
-            clearKeyboard: gateway.clearKeyboard,
             sendMessage: gateway.sendMessage,
-            reviewCandidate: (candidateId, action) =>
-              reviewProjectEventCandidate(
-                supabase,
-                context,
-                candidateId,
-                action,
-              ),
+            loadTask: (taskId) =>
+              getTaskForTelegramContext(supabase, context, taskId),
           })
-        : await handleCandidateCallback(update, context, {
-            answerCallback: gateway.answerCallback,
-            clearKeyboard: gateway.clearKeyboard,
-            sendMessage: gateway.sendMessage,
-            reviewCandidate: (candidateId, action) =>
-              reviewTaskCandidate(supabase, context, candidateId, action),
-          });
+        : isProjectEvent
+          ? await handleProjectEventCandidateCallback(update, context, {
+              answerCallback: gateway.answerCallback,
+              clearKeyboard: gateway.clearKeyboard,
+              sendMessage: gateway.sendMessage,
+              reviewCandidate: (candidateId, action) =>
+                reviewProjectEventCandidate(
+                  supabase,
+                  context,
+                  candidateId,
+                  action,
+                ),
+            })
+          : await handleCandidateCallback(update, context, {
+              answerCallback: gateway.answerCallback,
+              clearKeyboard: gateway.clearKeyboard,
+              sendMessage: gateway.sendMessage,
+              reviewCandidate: (candidateId, action) =>
+                reviewTaskCandidate(supabase, context, candidateId, action),
+            });
       replySent = result.replySent;
     }
 
@@ -190,6 +218,53 @@ export async function processTelegramUpdate(
     await failTelegramUpdate(supabase, update.updateId, message);
     throw error;
   }
+}
+
+export type TaskViewCallbackDependencies = {
+  answerCallback: (
+    callbackQueryId: string,
+    text?: string,
+  ) => Promise<TelegramDelivery>;
+  sendMessage: (
+    chatId: string | number,
+    text: string,
+  ) => Promise<TelegramDelivery>;
+  loadTask: (taskId: string) => Promise<TelegramUserTaskRow | null>;
+};
+
+export async function handleTaskViewCallback(
+  update: TelegramInboundCallback,
+  context: TelegramContext,
+  dependencies: TaskViewCallbackDependencies,
+) {
+  const callback = parseTaskViewCallbackData(update.data);
+  if (
+    !callback ||
+    !update.chat ||
+    (!context.projectId && !context.userRecordId)
+  ) {
+    await dependencies.answerCallback(
+      update.callbackQueryId,
+      "This task selection is invalid or expired.",
+    );
+    return { handled: false, replySent: false };
+  }
+
+  const task = await dependencies.loadTask(callback.taskId);
+  if (!task) {
+    await dependencies.answerCallback(
+      update.callbackQueryId,
+      "Task not found or unavailable in this chat.",
+    );
+    return { handled: true, replySent: false };
+  }
+
+  await dependencies.answerCallback(update.callbackQueryId, "Task details");
+  const delivery = await dependencies.sendMessage(
+    update.chat.id,
+    taskDetailMessage(task),
+  );
+  return { handled: true, replySent: delivery.sent, task };
 }
 
 export type ProjectEventCandidateCallbackDependencies = {
@@ -298,68 +373,43 @@ async function routeTelegramCommand(
   supabase: SupabaseClient,
   command: TelegramCommandName,
   context: TelegramContext,
-) {
-  if (command === "help") return helpMessage();
+  isPrivateChat: boolean,
+): Promise<TelegramCommandResponse> {
+  if (command === "start") {
+    return {
+      text: isPrivateChat
+        ? [
+            "👋 Welcome to your TaskGoblin workspace.",
+            "",
+            "Use /mytasks to browse your assigned tasks across every project.",
+            "Open a project group to use /summary, /project, /kpi, and /tasks.",
+          ].join("\n")
+        : helpMessage(),
+    };
+  }
+  if (command === "help") return { text: helpMessage() };
+  if (command === "mytasks" && isPrivateChat) {
+    if (!context.userRecordId) {
+      return { text: "I could not identify your Telegram account." };
+    }
+    const tasks = await listTelegramUserTasks(supabase, context.userRecordId);
+    return privateMyTasksResponse(tasks);
+  }
   if (!context.projectId) {
-    return "This chat is not linked to a TaskGoblin project. Add TaskGoblin to a project group first.";
+    return {
+      text: "This command needs a TaskGoblin project group. Use /mytasks here to browse your assignments across all projects.",
+    };
   }
 
-  const tasks = await listProjectTasks(supabase, context.projectId);
-  if (command === "summary") return summaryMessage(tasks);
-  if (command === "tasks") return tasksMessage(tasks);
-  return myTasksMessage(tasks, context.userRecordId);
-}
-
-function summaryMessage(tasks: TelegramTaskRow[]) {
-  const done = tasks.filter((task) => task.status === "done").length;
-  const blocked = tasks.filter((task) => task.status === "blocked").length;
-  const overdue = tasks.filter((task) => task.status === "overdue").length;
-  const active = tasks.length - done;
-  const unassigned = tasks.filter(
-    (task) =>
-      task.status !== "done" &&
-      !task.owner_telegram_user_id &&
-      !task.source_participant_name,
-  ).length;
-  return [
-    "Project summary",
-    `Active: ${active}`,
-    `Done: ${done}`,
-    `Blocked: ${blocked}`,
-    `Overdue: ${overdue}`,
-    `Unassigned: ${unassigned}`,
-  ].join("\n");
-}
-
-function tasksMessage(tasks: TelegramTaskRow[]) {
-  const active = tasks.filter((task) => task.status !== "done");
-  if (!active.length) return "No active confirmed tasks.";
-  return [
-    "Active tasks",
-    ...active.slice(0, 20).map((task, index) => formatTask(task, index)),
-    ...(active.length > 20 ? [`…and ${active.length - 20} more.`] : []),
-  ].join("\n");
-}
-
-function myTasksMessage(
-  tasks: TelegramTaskRow[],
-  telegramUserRecordId: string | null,
-) {
-  if (!telegramUserRecordId) return "I could not identify your Telegram account.";
-  const mine = tasks.filter(
-    (task) => task.owner_telegram_user_id === telegramUserRecordId,
-  );
-  if (!mine.length) return "No confirmed tasks are assigned to you.";
-  return [
-    "My tasks",
-    ...mine.slice(0, 20).map((task, index) => formatTask(task, index)),
-    ...(mine.length > 20 ? [`…and ${mine.length - 20} more.`] : []),
-  ].join("\n");
-}
-
-function formatTask(task: TelegramTaskRow, index: number) {
-  const due = task.due_label ? ` · due ${task.due_label}` : "";
-  return `${index + 1}. [${task.status}] ${task.title}${due}`;
+  const [project, tasks] = await Promise.all([
+    getTelegramProject(supabase, context.projectId),
+    listProjectTasks(supabase, context.projectId),
+  ]);
+  if (command === "summary") return summaryResponse(project, tasks);
+  if (command === "project") return projectResponse(project, tasks);
+  if (command === "kpi") return kpiResponse(project, tasks);
+  if (command === "tasks") return tasksResponse(project, tasks);
+  return groupMyTasksResponse(project, tasks, context.userRecordId);
 }
 
 function callbackAnswer(state: CandidateReviewResult["state"]) {

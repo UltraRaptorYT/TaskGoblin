@@ -1,6 +1,9 @@
 export const TELEGRAM_COMMANDS = [
+  "start",
   "help",
   "summary",
+  "project",
+  "kpi",
   "tasks",
   "mytasks",
 ] as const;
@@ -46,10 +49,13 @@ export function isTelegramCommandLike(text: string) {
 export function helpMessage() {
   return [
     "TaskGoblin commands:",
+    "/start — open your private TaskGoblin workspace",
     "/help — show this guide",
     "/summary — show confirmed project progress",
-    "/tasks — list active confirmed tasks",
-    "/mytasks — list confirmed tasks assigned to you",
+    "/project — show the project goal, state, and priorities",
+    "/kpi — show metrics calculated from confirmed tasks",
+    "/tasks — browse active confirmed tasks",
+    "/mytasks — browse your tasks; private chat includes every project",
     "",
     "TaskGoblin watches high-signal project commitments and asks before creating a task.",
   ].join("\n");

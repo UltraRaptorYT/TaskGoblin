@@ -9,7 +9,10 @@ const repository = vi.hoisted(() => ({
   completeTelegramUpdate: vi.fn(),
   ensureTelegramContext: vi.fn(),
   failTelegramUpdate: vi.fn(),
+  getTaskForTelegramContext: vi.fn(),
+  getTelegramProject: vi.fn(),
   listProjectTasks: vi.fn(),
+  listTelegramUserTasks: vi.fn(),
   persistTelegramMessage: vi.fn(),
   reviewProjectEventCandidate: vi.fn(),
   reviewTaskCandidate: vi.fn(),
@@ -110,6 +113,77 @@ describe("processTelegramUpdate onboarding", () => {
       { replyToMessageId: 2 },
     );
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
+  });
+
+  it("lists the member's tasks across projects in a private chat", async () => {
+    const gateway = gatewayMock();
+    repository.listTelegramUserTasks.mockResolvedValue([
+      {
+        id: "task-1",
+        project_id: "project-1",
+        project_name: "Website Launch",
+        title: "Implement endpoints",
+        description: null,
+        status: "doing",
+        priority: "high",
+        source_participant_name: "Alex Tan",
+        due_label: "Friday",
+        due_at: "2026-07-31T09:00:00.000Z",
+        blocked_by: null,
+        owner_telegram_user_id: "user-1",
+        updated_at: "2026-07-28T00:00:00.000Z",
+      },
+      {
+        id: "task-2",
+        project_id: "project-2",
+        project_name: "Demo",
+        title: "Prepare slides",
+        description: null,
+        status: "backlog",
+        priority: "medium",
+        source_participant_name: "Alex Tan",
+        due_label: null,
+        due_at: null,
+        blocked_by: null,
+        owner_telegram_user_id: "user-1",
+        updated_at: "2026-07-28T00:00:00.000Z",
+      },
+    ]);
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      {
+        ...baseMessage,
+        text: "/mytasks",
+        chat: {
+          id: 42,
+          type: "private",
+          title: null,
+          username: "alex",
+        },
+      },
+      gateway,
+    );
+
+    expect(repository.listTelegramUserTasks).toHaveBeenCalledWith(
+      expect.anything(),
+      "user-1",
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      42,
+      expect.stringMatching(/Website Launch[\s\S]*Demo/),
+      expect.objectContaining({
+        replyMarkup: {
+          inline_keyboard: expect.arrayContaining([
+            [
+              expect.objectContaining({
+                callback_data: "tg:t:v:task-1",
+              }),
+            ],
+          ]),
+        },
+      }),
+    );
   });
 });
 

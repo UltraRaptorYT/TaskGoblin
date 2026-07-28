@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "bot": "node scripts/telegram-bot.mjs",
+    "bot:configure": "node scripts/configure-telegram.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
