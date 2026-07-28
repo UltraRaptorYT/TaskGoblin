@@ -7,10 +7,12 @@ import type {
 } from "@/lib/project-event-detection";
 import type { ProjectEventType } from "@/lib/project-event-schemas";
 import type { CandidateCallbackAction } from "@/lib/telegram-callbacks";
+import type { TelegramDocumentExtraction } from "@/lib/telegram-document";
 import type { DeterministicTaskCandidate } from "@/lib/task-candidates";
 import type {
   TelegramActor,
   TelegramChat,
+  TelegramInboundDocument,
   TelegramInboundMessage,
   TelegramInboundUpdate,
 } from "@/lib/taskgoblin-types";
@@ -191,6 +193,61 @@ export async function persistTelegramMessage(
   return { id: data.id as string };
 }
 
+export async function updatePersistedTelegramMessageText(
+  supabase: SupabaseClient,
+  sourceMessage: PersistedTelegramMessage,
+  plainText: string,
+) {
+  const { error } = await supabase
+    .from("taskgoblin_telegram_messages")
+    .update({ plain_text: plainText })
+    .eq("id", sourceMessage.id);
+  if (error) {
+    throw new Error(`Could not update Telegram message text: ${error.message}`);
+  }
+}
+
+export async function persistTelegramProjectDocument(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  sourceMessage: PersistedTelegramMessage,
+  document: TelegramInboundDocument,
+  result:
+    | { extraction: TelegramDocumentExtraction; error?: never }
+    | { extraction?: never; error: string },
+) {
+  if (!context.projectId) {
+    throw new Error("Cannot persist a document without a Telegram project.");
+  }
+  const extraction = result.extraction;
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("taskgoblin_project_documents")
+    .upsert(
+      {
+        project_id: context.projectId,
+        source_telegram_message_id: sourceMessage.id,
+        telegram_file_id: document.fileId,
+        telegram_file_unique_id: document.fileUniqueId,
+        filename:
+          extraction?.filename ??
+          document.fileName ??
+          `document-${document.fileUniqueId}`,
+        mime_type: document.mimeType,
+        file_size: document.fileSize,
+        parse_status: extraction ? "processed" : "failed",
+        extracted_text: extraction?.text ?? "",
+        was_truncated: extraction?.wasTruncated ?? false,
+        error_message: result.error ?? null,
+        updated_at: now,
+      },
+      { onConflict: "source_telegram_message_id" },
+    );
+  if (error) {
+    throw new Error(`Could not persist Telegram document: ${error.message}`);
+  }
+}
+
 export async function createTaskCandidate(
   supabase: SupabaseClient,
   context: TelegramContext,
@@ -286,6 +343,7 @@ export async function loadProjectDetectionContext(
     { data: taskRows, error: taskError },
     { data: candidateRows, error: candidateError },
     { data: recentMessageRows, error: recentMessageError },
+    { data: documentRows, error: documentError },
   ] = await Promise.all([
     supabase
       .from("taskgoblin_projects")
@@ -311,6 +369,13 @@ export async function loadProjectDetectionContext(
       .order("created_at", { ascending: false })
       .limit(50),
     recentMessagesQuery,
+    supabase
+      .from("taskgoblin_project_documents")
+      .select("filename, extracted_text, created_at")
+      .eq("project_id", projectId)
+      .eq("parse_status", "processed")
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
   if (projectError || !project) {
     throw new Error(
@@ -331,6 +396,11 @@ export async function loadProjectDetectionContext(
   if (recentMessageError) {
     throw new Error(
       `Could not load recent Telegram messages: ${recentMessageError.message}`,
+    );
+  }
+  if (documentError) {
+    throw new Error(
+      `Could not load project documents: ${documentError.message}`,
     );
   }
 
@@ -374,6 +444,10 @@ export async function loadProjectDetectionContext(
       id: row.id as string,
       eventType: row.event_type as ProjectEventType,
       summary: row.summary as string,
+    })),
+    documents: (documentRows ?? []).map((row) => ({
+      filename: row.filename as string,
+      extractedText: (row.extracted_text as string).slice(0, 12_000),
     })),
     recentMessages: (recentMessageRows ?? [])
       .map((row) => {

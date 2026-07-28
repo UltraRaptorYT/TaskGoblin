@@ -78,6 +78,44 @@ describe("normalizeTelegramUpdate", () => {
     ]);
   });
 
+  it("normalizes Telegram document metadata and its caption", () => {
+    const result = normalizeTelegramUpdate({
+      update_id: 61,
+      message: {
+        message_id: 15,
+        date: 1_700_000_000,
+        chat: { id: -100123, type: "supergroup", title: "Launch" },
+        from: {
+          id: 42,
+          is_bot: false,
+          first_name: "Alex",
+          username: "alex",
+        },
+        caption: "Here is our assignment brief",
+        document: {
+          file_id: "telegram-file-id",
+          file_unique_id: "stable-file-id",
+          file_name: "assignment.pdf",
+          mime_type: "application/pdf",
+          file_size: 159_300,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || !result.update || result.update.kind !== "message") {
+      throw new Error("Expected a normalized document message");
+    }
+    expect(result.update.text).toBe("Here is our assignment brief");
+    expect(result.update.document).toEqual({
+      fileId: "telegram-file-id",
+      fileUniqueId: "stable-file-id",
+      fileName: "assignment.pdf",
+      mimeType: "application/pdf",
+      fileSize: 159_300,
+    });
+  });
+
   it("normalizes the reliable my_chat_member bot-added update", () => {
     const result = normalizeTelegramUpdate({
       update_id: 60,

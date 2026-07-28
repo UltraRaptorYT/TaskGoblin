@@ -146,6 +146,14 @@ export type TelegramChat = {
   username: string | null;
 };
 
+export type TelegramInboundDocument = {
+  fileId: string;
+  fileUniqueId: string;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+};
+
 export type TelegramInboundMessage = {
   kind: "message";
   updateId: number;
@@ -160,6 +168,7 @@ export type TelegramInboundMessage = {
   text: string;
   chat: TelegramChat;
   actor: TelegramActor | null;
+  document?: TelegramInboundDocument | null;
   newChatMembers: TelegramActor[];
   replyToMessageId: number | null;
   messageThreadId: number | null;

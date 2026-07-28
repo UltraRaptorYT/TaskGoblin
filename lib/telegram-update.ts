@@ -33,6 +33,16 @@ const telegramMessageSchema = z.object({
   message_thread_id: z.number().int().optional(),
   text: z.string().optional(),
   caption: z.string().optional(),
+  document: z
+    .object({
+      file_id: z.string().min(1),
+      file_unique_id: z.string().min(1),
+      file_name: z.string().optional(),
+      mime_type: z.string().optional(),
+      file_size: z.number().int().nonnegative().optional(),
+    })
+    .passthrough()
+    .optional(),
   chat: telegramChatSchema,
   from: telegramUserSchema.optional(),
   new_chat_members: z.array(telegramUserSchema).optional(),
@@ -155,6 +165,15 @@ export function normalizeTelegramUpdate(
       text: (message.text ?? message.caption ?? "").trim(),
       chat: normalizeChat(message.chat),
       actor: message.from ? normalizeActor(message.from) : null,
+      document: message.document
+        ? {
+            fileId: message.document.file_id,
+            fileUniqueId: message.document.file_unique_id,
+            fileName: message.document.file_name ?? null,
+            mimeType: message.document.mime_type ?? null,
+            fileSize: message.document.file_size ?? null,
+          }
+        : null,
       newChatMembers: (message.new_chat_members ?? []).map(normalizeActor),
       replyToMessageId: message.reply_to_message?.message_id ?? null,
       messageThreadId: message.message_thread_id ?? null,

@@ -66,6 +66,10 @@ The per-message AI migration additionally adds project timezone, auditable AI
 detection runs, generic project-event candidates, duplicate/task-match
 references, and an atomic human-review transition.
 
+The Telegram document-context migration stores private metadata and extracted
+text for supported files shared in project groups. Binary files are downloaded
+from Telegram only for parsing and are not retained by TaskGoblin.
+
 A new group is provisioned with a workspace and project when its first update
 is processed. This is an MVP default and can later be replaced by an explicit
 admin linking flow.
@@ -93,6 +97,7 @@ Configure Telegram to send the secret in
 - `/mytasks`
 - project-event Confirm, Edit and Ignore callbacks
 - inline task-selection callbacks
+- project-group PDF, DOCX, TXT and MD context ingestion
 
 After deployment, configure both the command menus and webhook update types:
 
@@ -110,6 +115,10 @@ link their Telegram identity to the project. Members must also open the bot
 privately and press Start once before Telegram will allow private reminders.
 In a private bot chat, `/mytasks` groups the requesting user's confirmed tasks
 across every TaskGoblin project.
+
+Documents sent in a linked project group are limited to 15 MB. TaskGoblin
+stores their extracted text as project context and acknowledges success or
+failure in Telegram. Scanned PDFs require OCR before they can be read.
 
 After deploying command changes, configure Telegram's private and group command
 menus:

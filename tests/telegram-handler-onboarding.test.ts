@@ -16,16 +16,29 @@ const repository = vi.hoisted(() => ({
   getTelegramProject: vi.fn(),
   listProjectTasks: vi.fn(),
   listTelegramUserTasks: vi.fn(),
+  persistTelegramProjectDocument: vi.fn(),
   persistTelegramMessage: vi.fn(),
   reviewProjectEventCandidate: vi.fn(),
   reviewTaskCandidate: vi.fn(),
+  updatePersistedTelegramMessageText: vi.fn(),
 }));
 const eventPipeline = vi.hoisted(() => ({
   detectAndPersistProjectEvent: vi.fn(),
 }));
+const telegramDocument = vi.hoisted(() => ({
+  displayFilename: vi.fn(() => "assignment.txt"),
+  documentMessageText: vi.fn(
+    (_message: TelegramInboundMessage, extraction?: { text: string }) =>
+      extraction
+        ? `Telegram document: assignment.txt\n\nExtracted document content:\n${extraction.text}`
+        : "Telegram document: assignment.txt",
+  ),
+  extractTelegramDocument: vi.fn(),
+}));
 
 vi.mock("@/lib/telegram-repository", () => repository);
 vi.mock("@/lib/telegram-event-pipeline", () => eventPipeline);
+vi.mock("@/lib/telegram-document", () => telegramDocument);
 
 const baseMessage: TelegramInboundMessage = {
   kind: "message",
@@ -62,8 +75,16 @@ describe("processTelegramUpdate onboarding", () => {
       displayName: "Alex Tan",
     });
     repository.persistTelegramMessage.mockResolvedValue({ id: "message-1" });
+    repository.persistTelegramProjectDocument.mockResolvedValue(undefined);
+    repository.updatePersistedTelegramMessageText.mockResolvedValue(undefined);
     repository.completeTelegramUpdate.mockResolvedValue(undefined);
     eventPipeline.detectAndPersistProjectEvent.mockResolvedValue(null);
+    telegramDocument.extractTelegramDocument.mockResolvedValue({
+      filename: "assignment.txt",
+      extension: "txt",
+      text: "Build the API and submit it Friday.",
+      wasTruncated: false,
+    });
   });
 
   it("sends the welcome before AI detection when TaskGoblin joins", async () => {
@@ -151,6 +172,60 @@ describe("processTelegramUpdate onboarding", () => {
       { replyToMessageId: 2 },
     );
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
+  });
+
+  it("reads a Telegram document and adds its text to project context", async () => {
+    const gateway = gatewayMock();
+    const update: TelegramInboundMessage = {
+      ...baseMessage,
+      text: "Here is our assignment document",
+      document: {
+        fileId: "file-id",
+        fileUniqueId: "file-unique-id",
+        fileName: "assignment.txt",
+        mimeType: "text/plain",
+        fileSize: 35,
+      },
+    };
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      update,
+      gateway,
+    );
+
+    expect(telegramDocument.extractTelegramDocument).toHaveBeenCalledWith(
+      update.document,
+    );
+    expect(repository.persistTelegramProjectDocument).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ projectId: "project-1" }),
+      { id: "message-1" },
+      update.document,
+      expect.objectContaining({
+        extraction: expect.objectContaining({
+          filename: "assignment.txt",
+        }),
+      }),
+    );
+    expect(repository.updatePersistedTelegramMessageText).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: "message-1" },
+      expect.stringContaining("Build the API and submit it Friday."),
+    );
+    expect(eventPipeline.detectAndPersistProjectEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      { id: "message-1" },
+      expect.objectContaining({
+        text: expect.stringContaining("Build the API and submit it Friday."),
+      }),
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      expect.stringContaining("added it to this project's context"),
+      { replyToMessageId: 2 },
+    );
   });
 
   it("lists the member's tasks across projects in a private chat", async () => {

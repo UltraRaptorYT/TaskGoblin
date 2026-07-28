@@ -39,15 +39,22 @@ import {
   getTelegramProject,
   listProjectTasks,
   listTelegramUserTasks,
+  persistTelegramProjectDocument,
   persistTelegramMessage,
   reviewProjectEventCandidate,
   reviewTaskCandidate,
+  updatePersistedTelegramMessageText,
   type CandidateReviewResult,
   type PersistedProjectEventCandidate,
   type ProjectEventCandidateReviewResult,
   type TelegramContext,
   type TelegramUserTaskRow,
 } from "@/lib/telegram-repository";
+import {
+  displayFilename,
+  documentMessageText,
+  extractTelegramDocument,
+} from "@/lib/telegram-document";
 import { detectAndPersistProjectEvent } from "@/lib/telegram-event-pipeline";
 import {
   telegramBotAddedReply,
@@ -102,21 +109,90 @@ export async function processTelegramUpdate(
       );
       replySent = delivery.sent;
     } else if (update.kind === "message") {
+      let detectionMessage = update.document
+        ? { ...update, text: documentMessageText(update) }
+        : update;
       const persistedMessage = await persistTelegramMessage(
         supabase,
-        update,
+        detectionMessage,
         context,
       );
+      let documentFailed = false;
+      if (update.document) {
+        if (!context.projectId) {
+          const delivery = await gateway.sendMessage(
+            update.chat.id,
+            "Send this document in a TaskGoblin project group so I can add it to that project's context.",
+            { replyToMessageId: update.messageId },
+          );
+          replySent = delivery.sent;
+          documentFailed = true;
+        } else {
+          try {
+            const extraction = await extractTelegramDocument(update.document);
+            detectionMessage = {
+              ...update,
+              text: documentMessageText(update, extraction),
+            };
+            await Promise.all([
+              updatePersistedTelegramMessageText(
+                supabase,
+                persistedMessage,
+                detectionMessage.text,
+              ),
+              persistTelegramProjectDocument(
+                supabase,
+                context,
+                persistedMessage,
+                update.document,
+                { extraction },
+              ),
+            ]);
+            const delivery = await gateway.sendMessage(
+              update.chat.id,
+              [
+                `📄 Read ${extraction.filename} and added it to this project's context.`,
+                extraction.wasTruncated
+                  ? "The document was long, so only the first 120,000 characters were retained."
+                  : "I can now use it to understand later task discussions in this group.",
+              ].join("\n"),
+              { replyToMessageId: update.messageId },
+            );
+            replySent = delivery.sent;
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "TaskGoblin could not read this document.";
+            await persistTelegramProjectDocument(
+              supabase,
+              context,
+              persistedMessage,
+              update.document,
+              { error: message },
+            );
+            const delivery = await gateway.sendMessage(
+              update.chat.id,
+              `I couldn't read ${displayFilename(update.document)}. ${message}`,
+              { replyToMessageId: update.messageId },
+            );
+            replySent = delivery.sent;
+            documentFailed = true;
+          }
+        }
+      }
       const command = parseTelegramCommand(
-        update.text,
+        detectionMessage.text,
         process.env.TELEGRAM_BOT_USERNAME,
       );
-      const onboardingReply = telegramOnboardingReply(
-        update,
-        context,
-        process.env.TELEGRAM_BOT_USERNAME,
-        process.env.TELEGRAM_BOT_TOKEN,
-      );
+      const onboardingReply = update.document
+        ? null
+        : telegramOnboardingReply(
+            update,
+            context,
+            process.env.TELEGRAM_BOT_USERNAME,
+            process.env.TELEGRAM_BOT_TOKEN,
+          );
 
       if (onboardingReply) {
         const delivery = await gateway.sendMessage(
@@ -143,12 +219,16 @@ export async function processTelegramUpdate(
           },
         );
         replySent = delivery.sent;
-      } else if (!isTelegramCommandLike(update.text) && context.projectId) {
+      } else if (
+        !documentFailed &&
+        !isTelegramCommandLike(detectionMessage.text) &&
+        context.projectId
+      ) {
         const candidate = await detectAndPersistProjectEvent(
           supabase,
           context,
           persistedMessage,
-          update,
+          detectionMessage,
         );
         if (candidate) {
           const delivery = await gateway.sendMessage(
@@ -185,7 +265,7 @@ export async function processTelegramUpdate(
               },
             },
           );
-          replySent = delivery.sent;
+          replySent = delivery.sent || replySent;
         }
       }
     } else {

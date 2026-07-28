@@ -15,6 +15,17 @@ import {
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { TelegramProjectTask } from "@/lib/telegram-web-data";
 
 type ProjectMember = {
@@ -635,96 +646,111 @@ function TaskEditor({
               {draft.id ? "Update task" : "Create task"}
             </h3>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-lg"
             onClick={onClose}
             className="grid size-10 cursor-pointer place-items-center rounded-full border border-white/10 text-[#aabbb0] hover:text-white"
             aria-label="Close task editor"
           >
             <X className="size-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-6 space-y-4">
           <Field label="Title">
-            <input
+            <Input
               value={draft.title}
               maxLength={200}
               onChange={(event) =>
                 onChange({ ...draft, title: event.target.value })
               }
-              className={inputClass}
+              className={formControlClass}
             />
           </Field>
           <Field label="Description">
-            <textarea
+            <Textarea
               value={draft.description}
               maxLength={2_000}
               rows={3}
               onChange={(event) =>
                 onChange({ ...draft, description: event.target.value })
               }
-              className={`${inputClass} resize-y py-3`}
+              className={`${formControlClass} resize-y py-3`}
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Status">
-              <select
+              <Select
                 value={draft.status}
-                onChange={(event) =>
-                  onChange({ ...draft, status: event.target.value })
+                onValueChange={(value) =>
+                  onChange({ ...draft, status: value })
                 }
-                className={inputClass}
               >
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={formControlClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={selectContentClass}>
+                  {statuses.map((status) => (
+                    <SelectItem key={status.id} value={status.id}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Priority">
-              <select
+              <Select
                 value={draft.priority}
-                onChange={(event) =>
-                  onChange({ ...draft, priority: event.target.value })
+                onValueChange={(value) =>
+                  onChange({ ...draft, priority: value })
                 }
-                className={inputClass}
               >
-                {priorities.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {capitalize(priority)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={formControlClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={selectContentClass}>
+                  {priorities.map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {capitalize(priority)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Owner">
-              <select
-                value={draft.ownerTelegramUserId}
-                onChange={(event) =>
+              <Select
+                value={draft.ownerTelegramUserId || "unassigned"}
+                onValueChange={(value) =>
                   onChange({
                     ...draft,
-                    ownerTelegramUserId: event.target.value,
+                    ownerTelegramUserId:
+                      value === "unassigned" ? "" : value,
                   })
                 }
-                className={inputClass}
               >
-                <option value="">Unassigned</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={formControlClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={selectContentClass}>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Deadline">
-              <input
+              <Input
                 type="datetime-local"
                 value={draft.dueAt}
                 onChange={(event) =>
                   onChange({ ...draft, dueAt: event.target.value })
                 }
-                className={inputClass}
+                className={formControlClass}
               />
             </Field>
           </div>
@@ -735,15 +761,18 @@ function TaskEditor({
         ) : null}
 
         <div className="mt-7 flex justify-end gap-3 border-t border-white/10 pt-5">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="lg"
             onClick={onClose}
             className="cursor-pointer rounded-xl border border-white/12 px-4 py-3 text-sm font-black text-[#aabbb0] hover:text-white"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="lg"
             onClick={onSave}
             disabled={saving || !draft.title.trim()}
             className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#dfff64] px-5 py-3 text-sm font-black text-[#173d2b] transition hover:bg-[#e8ff8f] disabled:cursor-not-allowed disabled:opacity-50"
@@ -754,7 +783,7 @@ function TaskEditor({
               : draft.id
                 ? "Save changes"
                 : "Create task"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -769,12 +798,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
+    <Label className="block">
       <span className="mb-1.5 block text-xs font-black text-[#aabbb0]">
         {label}
       </span>
       {children}
-    </label>
+    </Label>
   );
 }
 
@@ -792,8 +821,10 @@ function TaskBadge({ label, subtle = false }: { label: string; subtle?: boolean 
   );
 }
 
-const inputClass =
+const formControlClass =
   "h-11 w-full rounded-xl border border-white/12 bg-black/20 px-3 text-sm text-white outline-none transition focus:border-[#dfff64]/60 focus:ring-2 focus:ring-[#dfff64]/10";
+const selectContentClass =
+  "border-white/12 bg-[#102219] text-white shadow-2xl";
 
 function statusLabel(status: string) {
   return statuses.find((item) => item.id === status)?.label ?? status;

@@ -8,16 +8,25 @@ const MAX_TEXT_CHARACTERS = 120_000;
 const EXTENSIONS = new Set(["pdf", "docx", "txt", "md"]);
 
 export async function readProjectBrief(file: File) {
-  if (file.size > MAX_FILE_BYTES) {
+  return readProjectBriefBuffer(
+    file.name,
+    Buffer.from(await file.arrayBuffer()),
+  );
+}
+
+export async function readProjectBriefBuffer(
+  filename: string,
+  buffer: Buffer,
+) {
+  if (buffer.byteLength > MAX_FILE_BYTES) {
     throw new Error("Project briefs must be 15 MB or smaller.");
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const extension = filename.split(".").pop()?.toLowerCase() ?? "";
   if (!EXTENSIONS.has(extension)) {
     throw new Error("Upload a PDF, Word document, Markdown file, or text file.");
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   let text = "";
 
   if (extension === "pdf") {
@@ -36,7 +45,7 @@ export async function readProjectBrief(file: File) {
   }
 
   return {
-    filename: file.name,
+    filename,
     extension,
     text: normalizedText.slice(0, MAX_TEXT_CHARACTERS),
     wasTruncated: normalizedText.length > MAX_TEXT_CHARACTERS,
