@@ -550,6 +550,7 @@ const PROJECT_REQUEST_PATTERNS = [
   /\bwhat are (?:the |our )?(?:other )?(?:next steps?|tasks?|deadlines?|blockers?)\b/i,
   /\b(?:do you |can you )?remember (?:this|that|the) (?:context|document|pdf|file|brief)\b/i,
   /\bbased on (?:this|that|the) (?:context|document|pdf|file|brief)\b/i,
+  /\b(?:break|split)\b.{0,30}\b(?:down|into)\b.{0,60}\b(?:tasks?|steps?|work)\b/i,
   /\bhow (?:are we|is (?:the|our) project) (?:doing|going)\b/i,
   /\b(?:come|figure) (?:up|out) with (?:some )?(?:project )?tasks?\b/i,
   /\b(?:suggest|recommend|identify|generate|plan|break down|list|give)\b.{0,80}\b(?:tasks?|work|steps?|next steps?|things? to do)\b/i,

@@ -27,6 +27,13 @@ export type TelegramContext = {
 export type PersistedTelegramMessage = { id: string };
 export type PersistedTaskCandidate = { id: string; title: string };
 
+export type TelegramPrivateReplyContext = {
+  projectId: string;
+  projectName: string;
+  taskId: string;
+  taskTitle: string;
+};
+
 export type AgentTaskCandidateInput = {
   title: string;
   description: string | null;
@@ -237,6 +244,91 @@ export async function updatePersistedTelegramMessageText(
   if (error) {
     throw new Error(`Could not update Telegram message text: ${error.message}`);
   }
+}
+
+export async function linkPersistedTelegramMessageToProject(
+  supabase: SupabaseClient,
+  sourceMessage: PersistedTelegramMessage,
+  projectId: string,
+) {
+  const { error } = await supabase
+    .from("taskgoblin_telegram_messages")
+    .update({ project_id: projectId })
+    .eq("id", sourceMessage.id);
+  if (error) {
+    throw new Error(
+      `Could not link private Telegram reply to its project: ${error.message}`,
+    );
+  }
+}
+
+export async function resolvePrivateReminderReplyContext(
+  supabase: SupabaseClient,
+  telegramUserRecordId: string,
+  telegramChatId: number,
+  replyToTelegramMessageId: number,
+): Promise<TelegramPrivateReplyContext | null> {
+  const { data: delivery, error: deliveryError } = await supabase
+    .from("taskgoblin_notification_deliveries")
+    .select("reminder_id")
+    .eq("channel", "telegram")
+    .eq("status", "sent")
+    .eq("recipient_telegram_chat_id", telegramChatId)
+    .eq("provider_message_id", String(replyToTelegramMessageId))
+    .not("reminder_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (deliveryError) {
+    throw new Error(
+      `Could not resolve Telegram reminder delivery: ${deliveryError.message}`,
+    );
+  }
+  if (!delivery?.reminder_id) return null;
+
+  const { data: reminder, error: reminderError } = await supabase
+    .from("taskgoblin_reminders")
+    .select("task_id")
+    .eq("id", delivery.reminder_id)
+    .maybeSingle();
+  if (reminderError) {
+    throw new Error(
+      `Could not resolve Telegram reminder task: ${reminderError.message}`,
+    );
+  }
+  if (!reminder?.task_id) return null;
+
+  const { data: task, error: taskError } = await supabase
+    .from("taskgoblin_tasks")
+    .select("id, project_id, title")
+    .eq("id", reminder.task_id)
+    .eq("owner_telegram_user_id", telegramUserRecordId)
+    .maybeSingle();
+  if (taskError) {
+    throw new Error(
+      `Could not resolve Telegram reminder owner: ${taskError.message}`,
+    );
+  }
+  if (!task?.project_id) return null;
+
+  const { data: project, error: projectError } = await supabase
+    .from("taskgoblin_projects")
+    .select("name")
+    .eq("id", task.project_id)
+    .maybeSingle();
+  if (projectError) {
+    throw new Error(
+      `Could not resolve Telegram reminder project: ${projectError.message}`,
+    );
+  }
+  if (!project) return null;
+
+  return {
+    projectId: task.project_id as string,
+    projectName: project.name as string,
+    taskId: task.id as string,
+    taskTitle: task.title as string,
+  };
 }
 
 export async function persistTelegramProjectDocument(

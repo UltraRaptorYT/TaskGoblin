@@ -115,6 +115,20 @@ describe("Telegram project agent intent routing", () => {
         "taskgoblin_launch_bot",
       ),
     ).toBe(true);
+    expect(
+      shouldInvokeTelegramProjectAgent(
+        {
+          ...message,
+          text: [
+            "okay i think need to work on the AI Agent",
+            "need to break it down into small tasks bah",
+            "like do some research first",
+            "then move on to some experiment",
+          ].join("\n"),
+        },
+        "taskgoblin_launch_bot",
+      ),
+    ).toBe(true);
   });
 
   it("routes bot mentions but leaves ambient commitments alone", () => {

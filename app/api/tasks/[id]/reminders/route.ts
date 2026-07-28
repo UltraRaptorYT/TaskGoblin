@@ -81,6 +81,7 @@ export async function POST(
       provider_message_id: delivery.messageId
         ? String(delivery.messageId)
         : null,
+      recipient_telegram_chat_id: chatId ?? null,
       status: delivery.sent ? "sent" : "failed",
       provider_payload: delivery.providerPayload ?? {},
       error_message: delivery.error ?? null,

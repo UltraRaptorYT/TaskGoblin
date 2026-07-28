@@ -32,6 +32,7 @@ import {
   parseTelegramCommand,
   type TelegramCommandName,
 } from "@/lib/telegram-commands";
+import { coalesceRapidTelegramMessages } from "@/lib/telegram-message-batching";
 import {
   claimTelegramUpdate,
   completeTelegramUpdate,
@@ -39,6 +40,7 @@ import {
   failTelegramUpdate,
   getTaskForTelegramContext,
   getTelegramProject,
+  linkPersistedTelegramMessageToProject,
   listProjectTasks,
   listTelegramUserTasks,
   persistTelegramProjectDocument,
@@ -47,6 +49,7 @@ import {
   reviewProjectNameCandidate,
   reviewProjectEventCandidate,
   reviewTaskCandidate,
+  resolvePrivateReminderReplyContext,
   updatePersistedTelegramMessageText,
   type CandidateBatchReviewResult,
   type CandidateReviewResult,
@@ -54,6 +57,7 @@ import {
   type ProjectEventCandidateReviewResult,
   type ProjectNameCandidateReviewResult,
   type TelegramContext,
+  type TelegramPrivateReplyContext,
   type TelegramUserTaskRow,
 } from "@/lib/telegram-repository";
 import {
@@ -70,6 +74,7 @@ import {
 } from "@/lib/telegram-onboarding";
 import type {
   TelegramInboundCallback,
+  TelegramInboundMessage,
   TelegramInboundUpdate,
 } from "@/lib/taskgoblin-types";
 
@@ -202,6 +207,49 @@ export async function processTelegramUpdate(
             process.env.TELEGRAM_BOT_USERNAME,
             process.env.TELEGRAM_BOT_TOKEN,
           );
+      let effectiveContext = context;
+      let supersededByRapidMessage = false;
+
+      if (
+        !command &&
+        !onboardingReply &&
+        !documentFailed &&
+        update.chat.type === "private" &&
+        update.replyToMessageId &&
+        context.userRecordId
+      ) {
+        const replyContext = await resolvePrivateReminderReplyContext(
+          supabase,
+          context.userRecordId,
+          update.chat.id,
+          update.replyToMessageId,
+        );
+        if (replyContext) {
+          effectiveContext = {
+            ...context,
+            projectId: replyContext.projectId,
+          };
+          await linkPersistedTelegramMessageToProject(
+            supabase,
+            persistedMessage,
+            replyContext.projectId,
+          );
+          detectionMessage = privateReminderReplyMessage(
+            detectionMessage,
+            replyContext,
+          );
+        }
+      }
+
+      if (!command && !onboardingReply && !documentFailed) {
+        const batch = await coalesceRapidTelegramMessages(
+          supabase,
+          effectiveContext,
+          detectionMessage,
+        );
+        detectionMessage = batch.message;
+        supersededByRapidMessage = batch.superseded;
+      }
 
       if (onboardingReply) {
         const delivery = await gateway.sendMessage(
@@ -228,8 +276,10 @@ export async function processTelegramUpdate(
           },
         );
         replySent = delivery.sent;
+      } else if (supersededByRapidMessage) {
+        // The newest message in this burst will process the combined text.
       } else if (
-        context.projectId &&
+        effectiveContext.projectId &&
         shouldInvokeTelegramProjectAgent(
           detectionMessage,
           process.env.TELEGRAM_BOT_USERNAME,
@@ -237,7 +287,7 @@ export async function processTelegramUpdate(
       ) {
         const response = await answerTelegramProjectRequest(
           supabase,
-          context,
+          effectiveContext,
           persistedMessage,
           detectionMessage,
         );
@@ -255,11 +305,11 @@ export async function processTelegramUpdate(
       } else if (
         !documentFailed &&
         !isTelegramCommandLike(detectionMessage.text) &&
-        context.projectId
+        effectiveContext.projectId
       ) {
         const candidate = await detectAndPersistProjectEvent(
           supabase,
-          context,
+          effectiveContext,
           persistedMessage,
           detectionMessage,
         );
@@ -786,4 +836,18 @@ function formatReminderTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function privateReminderReplyMessage(
+  message: TelegramInboundMessage,
+  context: TelegramPrivateReplyContext,
+): TelegramInboundMessage {
+  return {
+    ...message,
+    text: [
+      `Private project follow-up for "${context.taskTitle}" in ${context.projectName}.`,
+      `The member replied: ${message.text}`,
+      "Give grounded, practical advice using the current task and project context.",
+    ].join("\n"),
+  };
 }

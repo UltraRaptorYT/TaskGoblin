@@ -14,6 +14,7 @@ const repository = vi.hoisted(() => ({
   failTelegramUpdate: vi.fn(),
   getTaskForTelegramContext: vi.fn(),
   getTelegramProject: vi.fn(),
+  linkPersistedTelegramMessageToProject: vi.fn(),
   listProjectTasks: vi.fn(),
   listTelegramUserTasks: vi.fn(),
   persistTelegramProjectDocument: vi.fn(),
@@ -22,6 +23,7 @@ const repository = vi.hoisted(() => ({
   reviewProjectNameCandidate: vi.fn(),
   reviewProjectEventCandidate: vi.fn(),
   reviewTaskCandidate: vi.fn(),
+  resolvePrivateReminderReplyContext: vi.fn(),
   updatePersistedTelegramMessageText: vi.fn(),
 }));
 const eventPipeline = vi.hoisted(() => ({
@@ -29,6 +31,9 @@ const eventPipeline = vi.hoisted(() => ({
 }));
 const projectAgentPipeline = vi.hoisted(() => ({
   answerTelegramProjectRequest: vi.fn(),
+}));
+const messageBatching = vi.hoisted(() => ({
+  coalesceRapidTelegramMessages: vi.fn(),
 }));
 const telegramDocument = vi.hoisted(() => ({
   displayFilename: vi.fn(() => "assignment.txt"),
@@ -44,6 +49,7 @@ const telegramDocument = vi.hoisted(() => ({
 vi.mock("@/lib/telegram-repository", () => repository);
 vi.mock("@/lib/telegram-event-pipeline", () => eventPipeline);
 vi.mock("@/lib/telegram-project-agent-pipeline", () => projectAgentPipeline);
+vi.mock("@/lib/telegram-message-batching", () => messageBatching);
 vi.mock("@/lib/telegram-document", () => telegramDocument);
 
 const baseMessage: TelegramInboundMessage = {
@@ -83,9 +89,24 @@ describe("processTelegramUpdate onboarding", () => {
     });
     repository.persistTelegramMessage.mockResolvedValue({ id: "message-1" });
     repository.persistTelegramProjectDocument.mockResolvedValue(undefined);
+    repository.linkPersistedTelegramMessageToProject.mockResolvedValue(
+      undefined,
+    );
+    repository.resolvePrivateReminderReplyContext.mockResolvedValue(null);
     repository.updatePersistedTelegramMessageText.mockResolvedValue(undefined);
     repository.completeTelegramUpdate.mockResolvedValue(undefined);
     eventPipeline.detectAndPersistProjectEvent.mockResolvedValue(null);
+    messageBatching.coalesceRapidTelegramMessages.mockImplementation(
+      async (
+        _supabase: SupabaseClient,
+        _context: unknown,
+        message: TelegramInboundMessage,
+      ) => ({
+        message,
+        superseded: false,
+        messageCount: 1,
+      }),
+    );
     projectAgentPipeline.answerTelegramProjectRequest.mockResolvedValue({
       provider: "openai",
       model: "test-agent",
@@ -361,6 +382,66 @@ describe("processTelegramUpdate onboarding", () => {
             ],
           ]),
         },
+      }),
+    );
+  });
+
+  it("links a private reminder reply back to its project and asks the agent for advice", async () => {
+    const gateway = gatewayMock();
+    repository.ensureTelegramContext.mockResolvedValue({
+      chatRecordId: "private-chat-1",
+      userRecordId: "user-1",
+      projectId: null,
+      displayName: "Alex Tan",
+    });
+    repository.resolvePrivateReminderReplyContext.mockResolvedValue({
+      projectId: "project-1",
+      projectName: "Website Launch",
+      taskId: "task-1",
+      taskTitle: "Work on the website",
+    });
+    const update: TelegramInboundMessage = {
+      ...baseMessage,
+      text: "I am unable to move on, give me advice",
+      replyToMessageId: 77,
+      chat: {
+        id: 42,
+        type: "private",
+        title: null,
+        username: "alex",
+      },
+    };
+
+    await processTelegramUpdate({} as SupabaseClient, update, gateway);
+
+    expect(repository.resolvePrivateReminderReplyContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "user-1",
+      42,
+      77,
+    );
+    expect(repository.linkPersistedTelegramMessageToProject).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: "message-1" },
+      "project-1",
+    );
+    expect(projectAgentPipeline.answerTelegramProjectRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ projectId: "project-1" }),
+      { id: "message-1" },
+      expect.objectContaining({
+        text: expect.stringMatching(
+          /Work on the website[\s\S]*unable to move on[\s\S]*practical advice/i,
+        ),
+      }),
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      42,
+      expect.stringContaining("report and demonstration"),
+      expect.objectContaining({
+        replyMarkup: expect.objectContaining({
+          inline_keyboard: expect.any(Array),
+        }),
       }),
     );
   });

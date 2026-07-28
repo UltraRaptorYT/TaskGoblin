@@ -39,6 +39,7 @@ OPENAI_SCAN_MODEL=gpt-5.6-terra
 OPENAI_REMINDER_MODEL=gpt-5.6-luna
 TELEGRAM_EVENT_DETECTION_MODE=openai
 TELEGRAM_PROJECT_AGENT_MODE=openai
+TELEGRAM_MESSAGE_DEBOUNCE_MS=2500
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEBHOOK_SECRET=
 TELEGRAM_BOT_USERNAME=
@@ -117,6 +118,19 @@ link their Telegram identity to the project. Members must also open the bot
 privately and press Start once before Telegram will allow private reminders.
 In a private bot chat, `/mytasks` groups the requesting user's confirmed tasks
 across every TaskGoblin project.
+
+Rapid non-command group messages from the same member are coalesced for
+`TELEGRAM_MESSAGE_DEBOUNCE_MS` (2.5 seconds by default, capped at 5 seconds).
+Only the newest message in the burst invokes OpenAI, so multi-bubble thoughts
+are handled as one request. Commands, onboarding, private messages and
+documents bypass this delay.
+
+Private replies to a delivered TaskGoblin reminder are linked back to the
+reminder's exact task and project. The project agent can then give grounded
+advice using current tasks and stored project documents, and returns the
+project dashboard link. Apply
+`supabase/migrations/20260728144617_telegram_private_reply_context.sql` before
+deploying this behavior.
 
 Documents sent in a linked project group are limited to 15 MB. TaskGoblin
 stores their extracted text as project context and acknowledges success or

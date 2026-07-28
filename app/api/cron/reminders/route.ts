@@ -91,6 +91,7 @@ export async function GET(request: Request) {
     const row = reminderTask(reminder);
     let message = "";
     let delivery: TelegramDelivery;
+    let recipientTelegramChatId: string | null = null;
 
     if (!row) {
       delivery = { sent: false, error: "Reminder task no longer exists." };
@@ -104,6 +105,7 @@ export async function GET(request: Request) {
           error: "The task has no linked Telegram owner.",
         };
       } else {
+        recipientTelegramChatId = recipientId;
         const task = taskItem(row);
         message = await generateAccountabilityMessage(task, reminder.tone);
         delivery = await sendTelegramMessage(recipientId, message);
@@ -125,6 +127,7 @@ export async function GET(request: Request) {
       provider_message_id: delivery.messageId
         ? String(delivery.messageId)
         : null,
+      recipient_telegram_chat_id: recipientTelegramChatId,
       status: delivery.sent ? "sent" : "failed",
       provider_payload: delivery.providerPayload ?? {},
       error_message: delivery.error ?? null,
