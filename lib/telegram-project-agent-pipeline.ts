@@ -45,6 +45,8 @@ export async function answerTelegramProjectRequest(
       beforeTelegramMessageId: message.messageId,
       messageThreadId: message.messageThreadId,
       sentAt: message.sentAt,
+      recentMessageLimit: 40,
+      maxLookbackMinutes: null,
     }),
   ]);
   const result = await runTelegramProjectAgent(

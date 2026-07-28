@@ -1,5 +1,6 @@
 import { taskViewCallbackData } from "@/lib/telegram-callbacks";
 import type { TelegramInlineKeyboard } from "@/lib/telegram-bot";
+import { telegramProjectDashboardUrl } from "@/lib/telegram-links";
 import type {
   TelegramProjectRow,
   TelegramTaskRow,
@@ -54,14 +55,17 @@ export function summaryResponse(
       "",
       "Current blockers:",
       ...(blockers.length
-        ? blockers.slice(0, 5).map((task) =>
-            task.blocked_by
-              ? `⛔ ${task.title} — ${task.blocked_by}`
-              : `⛔ ${task.title}`,
-          )
+        ? blockers
+            .slice(0, 5)
+            .map((task) =>
+              task.blocked_by
+                ? `⛔ ${task.title} — ${task.blocked_by}`
+                : `⛔ ${task.title}`,
+            )
         : ["None"]),
+      ...projectWebsiteLines(project.id),
     ].join("\n"),
-    replyMarkup: taskMenu(active),
+    replyMarkup: projectMenu(project, taskMenu(active)),
   };
 }
 
@@ -93,8 +97,9 @@ export function projectResponse(
               `${index + 1}. [${task.priority}] ${task.title}${dueSuffix(task)}`,
           )
         : ["No active confirmed tasks."]),
+      ...projectWebsiteLines(project.id),
     ].join("\n"),
-    replyMarkup: taskMenu(priorities),
+    replyMarkup: projectMenu(project, taskMenu(priorities)),
   };
 }
 
@@ -105,9 +110,7 @@ export function kpiResponse(
 ): TelegramCommandResponse {
   const completed = tasks.filter((task) => task.status === "done").length;
   const open = tasks.length - completed;
-  const rate = tasks.length
-    ? Math.round((completed / tasks.length) * 100)
-    : 0;
+  const rate = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
   const overdue = tasks.filter(
     (task) => task.status !== "done" && isOverdue(task, now),
   ).length;
@@ -131,7 +134,9 @@ export function kpiResponse(
       `Tasks without owners: ${unassigned}`,
       "",
       "Calculated only from confirmed stored tasks.",
+      ...projectWebsiteLines(project.id),
     ].join("\n"),
+    replyMarkup: projectMenu(project),
   };
 }
 
@@ -143,7 +148,15 @@ export function tasksResponse(
     .filter((task) => task.status !== "done")
     .sort(comparePriorityThenDue);
   if (!active.length) {
-    return { text: `📋 ${project.name}\n\nNo active confirmed tasks.` };
+    return {
+      text: [
+        `📋 ${project.name}`,
+        "",
+        "No active confirmed tasks.",
+        ...projectWebsiteLines(project.id),
+      ].join("\n"),
+      replyMarkup: projectMenu(project),
+    };
   }
   return {
     text: [
@@ -153,8 +166,9 @@ export function tasksResponse(
       ...(active.length > 20 ? [`…and ${active.length - 20} more.`] : []),
       "",
       "Select a task below for details.",
+      ...projectWebsiteLines(project.id),
     ].join("\n"),
-    replyMarkup: taskMenu(active),
+    replyMarkup: projectMenu(project, taskMenu(active)),
   };
 }
 
@@ -171,7 +185,13 @@ export function groupMyTasksResponse(
   );
   if (!mine.length) {
     return {
-      text: `📋 ${project.name}\n\nNo confirmed tasks are assigned to you.`,
+      text: [
+        `📋 ${project.name}`,
+        "",
+        "No confirmed tasks are assigned to you.",
+        ...projectWebsiteLines(project.id),
+      ].join("\n"),
+      replyMarkup: projectMenu(project),
     };
   }
   return {
@@ -181,8 +201,9 @@ export function groupMyTasksResponse(
       ...mine.map((task) => formattedTaskLine(task)),
       "",
       "Select a task below for details.",
+      ...projectWebsiteLines(project.id),
     ].join("\n"),
-    replyMarkup: taskMenu(mine),
+    replyMarkup: projectMenu(project, taskMenu(mine)),
   };
 }
 
@@ -211,10 +232,21 @@ export function privateMyTasksResponse(
         .map((task) => formattedTaskLine(task)),
     );
   }
-  lines.push("", "Select a task below for details.");
+  lines.push(
+    "",
+    "Select a task below for details, or open a project dashboard to manage its Kanban board and calendar.",
+  );
   return {
     text: lines.join("\n"),
-    replyMarkup: taskMenu(tasks, true),
+    replyMarkup: mergeMenus(
+      taskMenu(tasks, true),
+      projectLinksMenu(
+        [...projects.entries()].map(([projectId, projectTasks]) => ({
+          id: projectId,
+          name: projectTasks[0].project_name,
+        })),
+      ),
+    ),
   };
 }
 
@@ -258,6 +290,59 @@ function taskMenu(
     }
   });
   return buttons.length ? { inline_keyboard: buttons } : undefined;
+}
+
+function projectWebsiteLines(projectId: string) {
+  const url = telegramProjectDashboardUrl(projectId);
+  return url
+    ? [
+        "",
+        "Manage the Kanban board, calendar, deadlines, and task details:",
+        url,
+      ]
+    : [];
+}
+
+function projectMenu(
+  project: Pick<TelegramProjectRow, "id" | "name">,
+  existing?: TelegramInlineKeyboard,
+) {
+  return mergeMenus(
+    existing,
+    projectLinksMenu([{ id: project.id, name: project.name }]),
+  );
+}
+
+function projectLinksMenu(
+  projects: Array<{ id: string; name: string }>,
+): TelegramInlineKeyboard | undefined {
+  const inlineKeyboard = projects.slice(0, 8).flatMap((project) => {
+    const url = telegramProjectDashboardUrl(project.id);
+    return url
+      ? [
+          [
+            {
+              text: `🌐 Open ${truncate(project.name, 32)}`,
+              url,
+            },
+          ],
+        ]
+      : [];
+  });
+  return inlineKeyboard.length
+    ? { inline_keyboard: inlineKeyboard }
+    : undefined;
+}
+
+function mergeMenus(
+  ...menus: Array<TelegramInlineKeyboard | undefined>
+): TelegramInlineKeyboard | undefined {
+  const inlineKeyboard = menus.flatMap(
+    (menu) => menu?.inline_keyboard ?? [],
+  );
+  return inlineKeyboard.length
+    ? { inline_keyboard: inlineKeyboard }
+    : undefined;
 }
 
 function taskLines(tasks: TelegramTaskRow[], emoji: string) {
@@ -315,7 +400,5 @@ function statusEmoji(status: string) {
 }
 
 function truncate(value: string, maxLength: number) {
-  return value.length > maxLength
-    ? `${value.slice(0, maxLength - 1)}…`
-    : value;
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
 }

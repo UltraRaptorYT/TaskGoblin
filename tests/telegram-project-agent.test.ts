@@ -88,6 +88,33 @@ describe("Telegram project agent intent routing", () => {
         "taskgoblin_launch_bot",
       ),
     ).toBe(true);
+    expect(
+      shouldInvokeTelegramProjectAgent(
+        {
+          ...message,
+          text: "since i am blocked, what else should i work on?",
+        },
+        "taskgoblin_launch_bot",
+      ),
+    ).toBe(true);
+    expect(
+      shouldInvokeTelegramProjectAgent(
+        {
+          ...message,
+          text: "so what are the other tasks that we need to work on",
+        },
+        "taskgoblin_launch_bot",
+      ),
+    ).toBe(true);
+    expect(
+      shouldInvokeTelegramProjectAgent(
+        {
+          ...message,
+          text: "remember this context?",
+        },
+        "taskgoblin_launch_bot",
+      ),
+    ).toBe(true);
   });
 
   it("routes bot mentions but leaves ambient commitments alone", () => {
@@ -174,6 +201,55 @@ describe("runTelegramProjectAgent", () => {
     });
     expect(create.mock.calls[0][0].input).toContain("assignment.pdf");
     expect(create.mock.calls[0][0].input).toContain("Build the backend");
+  });
+
+  it("includes more than twelve persisted chat messages in agent memory", async () => {
+    const create = vi.fn().mockResolvedValue({
+      output: [
+        {
+          id: "fc-memory",
+          call_id: "call-memory",
+          type: "function_call",
+          name: "respond_to_project_request",
+          arguments: JSON.stringify({
+            responseText: "I remember the earlier project discussion.",
+            proposals: [],
+            proposedProjectName: null,
+            projectNameEvidence: null,
+            projectNameConfidence: null,
+          }),
+          status: "completed",
+        },
+      ],
+      output_text: "",
+    });
+    const client = {
+      responses: { create },
+    } as unknown as OpenAI;
+    const longContext = {
+      ...context,
+      recentMessages: Array.from({ length: 20 }, (_, index) => ({
+        telegramMessageId: index + 1,
+        sentAt: `2026-07-27T${String(index).padStart(2, "0")}:00:00.000Z`,
+        senderUsername: "UltraRaptor",
+        senderDisplayName: "Hong Yu",
+        text: `Persisted project context ${index + 1}`,
+        replyToTelegramMessageId: null,
+      })),
+    };
+
+    await runTelegramProjectAgent(message, project, longContext, {
+      mode: "openai",
+      client,
+      model: "test-agent-model",
+    });
+
+    expect(create.mock.calls[0][0].input).toContain(
+      "Persisted project context 1",
+    );
+    expect(create.mock.calls[0][0].input).toContain(
+      "Persisted project context 20",
+    );
   });
 
   it("uses deterministic project context when provider access is unavailable", async () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   kpiResponse,
@@ -36,6 +36,10 @@ const tasks: TelegramTaskRow[] = [
 ];
 
 describe("Telegram project command responses", () => {
+  beforeEach(() => {
+    process.env.TASKGOBLIN_APP_URL = "https://taskgoblin.vercel.app";
+  });
+
   it("builds a factual rich summary with a task menu", () => {
     const response = summaryResponse(
       project,
@@ -47,7 +51,17 @@ describe("Telegram project command responses", () => {
     expect(response.text).toContain("20% completed (1/5 confirmed tasks)");
     expect(response.text).toContain("Frontend implementation");
     expect(response.text).toContain("Waiting for credentials");
-    expect(response.replyMarkup?.inline_keyboard.length).toBe(4);
+    expect(response.text).toContain(
+      "Manage the Kanban board, calendar, deadlines, and task details:",
+    );
+    expect(response.text).toContain(
+      "https://taskgoblin.vercel.app/dashboard/projects/project-1",
+    );
+    expect(response.replyMarkup?.inline_keyboard).toHaveLength(5);
+    expect(response.replyMarkup?.inline_keyboard.at(-1)?.[0]).toMatchObject({
+      text: "🌐 Open Website Launch",
+      url: "https://taskgoblin.vercel.app/dashboard/projects/project-1",
+    });
   });
 
   it("derives project priorities and exact KPIs from stored tasks", () => {
@@ -66,6 +80,12 @@ describe("Telegram project command responses", () => {
     expect(kpis.text).toContain("Overdue tasks: 1");
     expect(kpis.text).toContain("Active blockers: 1");
     expect(kpis.text).toContain("Tasks without owners: 1");
+    expect(overview.replyMarkup?.inline_keyboard.at(-1)?.[0].url).toContain(
+      "/dashboard/projects/project-1",
+    );
+    expect(kpis.replyMarkup?.inline_keyboard.at(-1)?.[0].url).toContain(
+      "/dashboard/projects/project-1",
+    );
   });
 
   it("adds task selection buttons to the active task list", () => {
@@ -75,6 +95,9 @@ describe("Telegram project command responses", () => {
     expect(response.text).toContain("Select a task below");
     expect(response.replyMarkup?.inline_keyboard[0][0].callback_data).toMatch(
       /^tg:t:v:task-/,
+    );
+    expect(response.replyMarkup?.inline_keyboard.at(-1)?.[0].url).toContain(
+      "/dashboard/projects/project-1",
     );
   });
 
@@ -91,7 +114,15 @@ describe("Telegram project command responses", () => {
 
     expect(response.text).toContain("2 tasks across 2 projects");
     expect(response.text).toMatch(/Website Launch[\s\S]*Demo Day/);
-    expect(response.replyMarkup?.inline_keyboard).toHaveLength(2);
+    expect(response.replyMarkup?.inline_keyboard).toHaveLength(4);
+    expect(
+      response.replyMarkup?.inline_keyboard
+        .slice(-2)
+        .map((row) => row[0].url),
+    ).toEqual([
+      "https://taskgoblin.vercel.app/dashboard/projects/project-1",
+      "https://taskgoblin.vercel.app/dashboard/projects/project-2",
+    ]);
   });
 });
 

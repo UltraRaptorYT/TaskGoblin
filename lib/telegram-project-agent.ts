@@ -171,6 +171,12 @@ Call respond_to_project_request exactly once.
 
 Be useful and proactive within project management:
 - answer status and planning questions from the supplied context;
+- treat recentChat and projectDocuments as durable project memory. When asked
+  whether you remember something, state specifically what relevant context is
+  available instead of giving a generic acknowledgement;
+- when the user is blocked and asks what to do next, recommend uncovered or
+  unblocked work from currentTasks and projectDocuments. Do not reinterpret the
+  question itself as a new blocker;
 - when asked to identify, generate, assign, or break down work, return 2-8
   separate task proposals when the evidence supports multiple deliverables;
 - compare proposals with currentTasks and do not repeat covered work;
@@ -461,7 +467,7 @@ function buildAgentInput(
         )?.username ?? null,
       dueLabel: task.dueLabel,
     })),
-    recentChat: context.recentMessages.slice(-12).map((recent) => ({
+    recentChat: context.recentMessages.slice(-24).map((recent) => ({
       telegramMessageId: recent.telegramMessageId,
       senderUsername: recent.senderUsername,
       senderDisplayName: recent.senderDisplayName,
@@ -538,8 +544,12 @@ function normalizeProposal(
 
 const PROJECT_REQUEST_PATTERNS = [
   /\bwhat (?:else )?(?:needs?|need) to be done\b/i,
-  /\bwhat (?:else )?(?:do|should) we (?:need to )?do\b/i,
-  /\bwhat are (?:the |our )?(?:next steps?|tasks?|deadlines?|blockers?)\b/i,
+  /\bwhat (?:else )?(?:do|should) (?:i|we) (?:need to )?do\b/i,
+  /\bwhat (?:else )?(?:can|should) (?:i|we) work on(?: next)?\b/i,
+  /\bwhat (?:can|should) (?:i|we) work on (?:while|if|when) .{0,80}\b/i,
+  /\bwhat are (?:the |our )?(?:other )?(?:next steps?|tasks?|deadlines?|blockers?)\b/i,
+  /\b(?:do you |can you )?remember (?:this|that|the) (?:context|document|pdf|file|brief)\b/i,
+  /\bbased on (?:this|that|the) (?:context|document|pdf|file|brief)\b/i,
   /\bhow (?:are we|is (?:the|our) project) (?:doing|going)\b/i,
   /\b(?:come|figure) (?:up|out) with (?:some )?(?:project )?tasks?\b/i,
   /\b(?:suggest|recommend|identify|generate|plan|break down|list|give)\b.{0,80}\b(?:tasks?|work|steps?|next steps?|things? to do)\b/i,

@@ -510,8 +510,16 @@ export async function loadProjectDetectionContext(
     beforeTelegramMessageId: number;
     messageThreadId: number | null;
     sentAt: string | null;
+    recentMessageLimit?: number;
+    maxLookbackMinutes?: number | null;
   },
 ): Promise<ProjectDetectionContext> {
+  const recentMessageLimit = Math.min(
+    Math.max(window.recentMessageLimit ?? 12, 1),
+    50,
+  );
+  const maxLookbackMinutes =
+    window.maxLookbackMinutes === undefined ? 30 : window.maxLookbackMinutes;
   let recentMessagesQuery = supabase
     .from("taskgoblin_telegram_messages")
     .select(
@@ -523,17 +531,19 @@ export async function loadProjectDetectionContext(
     .in("message_type", ["message", "edited_message"])
     .neq("plain_text", "")
     .order("telegram_message_id", { ascending: false })
-    .limit(12);
+    .limit(recentMessageLimit);
   recentMessagesQuery =
     window.messageThreadId === null
       ? recentMessagesQuery.is("message_thread_id", null)
       : recentMessagesQuery.eq("message_thread_id", window.messageThreadId);
-  if (window.sentAt) {
+  if (window.sentAt && maxLookbackMinutes !== null) {
     const sentAt = new Date(window.sentAt);
     if (!Number.isNaN(sentAt.getTime())) {
       recentMessagesQuery = recentMessagesQuery.gte(
         "sent_at",
-        new Date(sentAt.getTime() - 30 * 60 * 1000).toISOString(),
+        new Date(
+          sentAt.getTime() - Math.max(maxLookbackMinutes, 0) * 60 * 1000,
+        ).toISOString(),
       );
     }
   }

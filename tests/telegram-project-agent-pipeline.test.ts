@@ -145,6 +145,14 @@ describe("Telegram project agent pipeline", () => {
         expect.objectContaining({ title: "Build the ETL pipeline" }),
       ]),
     );
+    expect(repository.loadProjectDetectionContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "project-1",
+      expect.objectContaining({
+        recentMessageLimit: 40,
+        maxLookbackMinutes: null,
+      }),
+    );
     expect(repository.queueAgentTaskCandidateBatch).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
