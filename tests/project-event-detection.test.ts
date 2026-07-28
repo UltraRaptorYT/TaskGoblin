@@ -186,6 +186,46 @@ describe("project event post-validation", () => {
         "Asia/Singapore",
       ),
     ).toBe("2026-07-28T01:00:00.000Z");
+    expect(
+      resolveDeadline(
+        "later in 30 minutes time",
+        "2026-07-27T04:00:00.000Z",
+        "Asia/Singapore",
+      ),
+    ).toBe("2026-07-27T04:30:00.000Z");
+  });
+
+  it("matches a gerund task reference for an explicit relative deadline", () => {
+    const context: ProjectDetectionContext = {
+      ...baseContext,
+      tasks: [
+        {
+          id: "task-dataset",
+          title: "Process and engineer the dataset",
+          status: "backlog",
+          ownerTelegramUserRecordId: "user-alice",
+          dueLabel: null,
+        },
+      ],
+    };
+    const message = messageFor({
+      id: "relative-minutes",
+      category: "deadline",
+      text: "set a deadline for the processing of the dataset to be due later in 30 minutes time",
+      senderUsername: "alice",
+      expectedEventType: "deadline_update",
+    });
+    const event = validateProjectEvent(
+      detectMockProjectEvent(message, context),
+      message,
+      context,
+    );
+
+    expect(event).toMatchObject({
+      eventType: "deadline_update",
+      matchedTaskId: "task-dataset",
+      dueAt: "2026-07-27T04:30:00.000Z",
+    });
   });
 
   it("uses deterministic mock mode without a provider key", async () => {

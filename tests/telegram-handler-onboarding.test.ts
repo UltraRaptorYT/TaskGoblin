@@ -14,16 +14,19 @@ const repository = vi.hoisted(() => ({
   failTelegramUpdate: vi.fn(),
   getTaskForTelegramContext: vi.fn(),
   getTelegramProject: vi.fn(),
+  loadProjectSummaryKnowledge: vi.fn(),
   linkPersistedTelegramMessageToProject: vi.fn(),
   listProjectTasks: vi.fn(),
   listTelegramUserTasks: vi.fn(),
   persistTelegramProjectDocument: vi.fn(),
   persistTelegramMessage: vi.fn(),
   reviewAgentTaskCandidateBatch: vi.fn(),
+  reviewBulkAssignmentCandidate: vi.fn(),
   reviewProjectNameCandidate: vi.fn(),
   reviewProjectEventCandidate: vi.fn(),
   reviewTaskCandidate: vi.fn(),
   resolvePrivateReminderReplyContext: vi.fn(),
+  resolveRecentPrivateReminderContext: vi.fn(),
   updatePersistedTelegramMessageText: vi.fn(),
 }));
 const eventPipeline = vi.hoisted(() => ({
@@ -93,6 +96,7 @@ describe("processTelegramUpdate onboarding", () => {
       undefined,
     );
     repository.resolvePrivateReminderReplyContext.mockResolvedValue(null);
+    repository.resolveRecentPrivateReminderContext.mockResolvedValue(null);
     repository.updatePersistedTelegramMessageText.mockResolvedValue(undefined);
     repository.completeTelegramUpdate.mockResolvedValue(undefined);
     eventPipeline.detectAndPersistProjectEvent.mockResolvedValue(null);
@@ -442,6 +446,58 @@ describe("processTelegramUpdate onboarding", () => {
         replyMarkup: expect.objectContaining({
           inline_keyboard: expect.any(Array),
         }),
+      }),
+    );
+  });
+
+  it("uses a recent private reminder when the member sends a natural follow-up without Telegram Reply", async () => {
+    const gateway = gatewayMock();
+    repository.ensureTelegramContext.mockResolvedValue({
+      chatRecordId: "private-chat-1",
+      userRecordId: "user-1",
+      projectId: null,
+      displayName: "Alex Tan",
+    });
+    repository.resolveRecentPrivateReminderContext.mockResolvedValue({
+      projectId: "project-1",
+      projectName: "Website Launch",
+      taskId: "task-1",
+      taskTitle: "Document and validate the processed dataset",
+    });
+    const update: TelegramInboundMessage = {
+      ...baseMessage,
+      text: "wah idk what to do sia",
+      replyToMessageId: null,
+      chat: {
+        id: 42,
+        type: "private",
+        title: null,
+        username: "alex",
+      },
+    };
+
+    await processTelegramUpdate({} as SupabaseClient, update, gateway);
+
+    expect(repository.resolveRecentPrivateReminderContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "user-1",
+      42,
+      update.sentAt,
+    );
+    expect(repository.resolvePrivateReminderReplyContext).not.toHaveBeenCalled();
+    expect(repository.linkPersistedTelegramMessageToProject).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: "message-1" },
+      "project-1",
+    );
+    expect(projectAgentPipeline.answerTelegramProjectRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ projectId: "project-1" }),
+      { id: "message-1" },
+      expect.objectContaining({
+        text: expect.stringMatching(
+          /Document and validate the processed dataset[\s\S]*idk what to do[\s\S]*practical advice/i,
+        ),
       }),
     );
   });

@@ -82,6 +82,24 @@ export type ProjectEventCandidateReviewResult = {
   reminderScheduledFor: string | null;
 };
 
+export type PersistedBulkAssignmentCandidate = {
+  id: string;
+  targetOwnerDisplayName: string;
+  taskCount: number;
+};
+
+export type BulkAssignmentReviewResult = {
+  candidateId: string;
+  state: "confirmed" | "ignored";
+  targetOwnerDisplayName: string;
+  assignedTaskCount: number;
+};
+
+export type ProjectSummaryKnowledge = {
+  documentNames: string[];
+  recentEvents: Array<{ eventType: string; title: string }>;
+};
+
 export type AiDetectionRun = {
   id: string;
 };
@@ -285,11 +303,61 @@ export async function resolvePrivateReminderReplyContext(
     );
   }
   if (!delivery?.reminder_id) return null;
+  return resolvePrivateReminderContext(
+    supabase,
+    telegramUserRecordId,
+    delivery.reminder_id as string,
+  );
+}
 
+export async function resolveRecentPrivateReminderContext(
+  supabase: SupabaseClient,
+  telegramUserRecordId: string,
+  telegramChatId: number,
+  inboundSentAt: string | null,
+  maxAgeMinutes = 30,
+): Promise<TelegramPrivateReplyContext | null> {
+  const receivedAt = inboundSentAt ? new Date(inboundSentAt) : new Date();
+  if (Number.isNaN(receivedAt.getTime())) return null;
+  const { data: delivery, error } = await supabase
+    .from("taskgoblin_notification_deliveries")
+    .select("reminder_id")
+    .eq("channel", "telegram")
+    .eq("status", "sent")
+    .eq("recipient_telegram_chat_id", telegramChatId)
+    .not("reminder_id", "is", null)
+    .lte("created_at", receivedAt.toISOString())
+    .gte(
+      "created_at",
+      new Date(
+        receivedAt.getTime() - Math.max(maxAgeMinutes, 1) * 60_000,
+      ).toISOString(),
+    )
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `Could not resolve recent Telegram reminder: ${error.message}`,
+    );
+  }
+  if (!delivery?.reminder_id) return null;
+  return resolvePrivateReminderContext(
+    supabase,
+    telegramUserRecordId,
+    delivery.reminder_id as string,
+  );
+}
+
+async function resolvePrivateReminderContext(
+  supabase: SupabaseClient,
+  telegramUserRecordId: string,
+  reminderId: string,
+): Promise<TelegramPrivateReplyContext | null> {
   const { data: reminder, error: reminderError } = await supabase
     .from("taskgoblin_reminders")
     .select("task_id")
-    .eq("id", delivery.reminder_id)
+    .eq("id", reminderId)
     .maybeSingle();
   if (reminderError) {
     throw new Error(
@@ -1147,6 +1215,183 @@ export async function listProjectTasks(
     .limit(100);
   if (error) throw new Error(`Could not load project tasks: ${error.message}`);
   return (data ?? []) as TelegramTaskRow[];
+}
+
+export async function loadProjectSummaryKnowledge(
+  supabase: SupabaseClient,
+  projectId: string,
+): Promise<ProjectSummaryKnowledge> {
+  const [
+    { data: documents, error: documentError },
+    { data: events, error: eventError },
+  ] = await Promise.all([
+    supabase
+      .from("taskgoblin_project_documents")
+      .select("filename")
+      .eq("project_id", projectId)
+      .eq("parse_status", "processed")
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("taskgoblin_project_events")
+      .select("event_type, title")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+  if (documentError) {
+    throw new Error(`Could not load project documents: ${documentError.message}`);
+  }
+  if (eventError) {
+    throw new Error(`Could not load project memory: ${eventError.message}`);
+  }
+  return {
+    documentNames: (documents ?? []).map((row) => row.filename as string),
+    recentEvents: (events ?? []).map((row) => ({
+      eventType: row.event_type as string,
+      title: row.title as string,
+    })),
+  };
+}
+
+export async function findProjectMemberByUsername(
+  supabase: SupabaseClient,
+  projectId: string,
+  username: string,
+): Promise<{ telegramUserRecordId: string; displayName: string } | null> {
+  const normalized = username.replace(/^@/, "").trim();
+  if (!/^[a-z0-9_]{5,32}$/i.test(normalized)) return null;
+  const { data: user, error: userError } = await supabase
+    .from("taskgoblin_telegram_users")
+    .select("id")
+    .ilike("username", normalized)
+    .maybeSingle();
+  if (userError) {
+    throw new Error(`Could not resolve Telegram username: ${userError.message}`);
+  }
+  if (!user) return null;
+  return getProjectMemberOwner(supabase, projectId, user.id as string);
+}
+
+export async function getProjectMemberOwner(
+  supabase: SupabaseClient,
+  projectId: string,
+  telegramUserRecordId: string,
+): Promise<{ telegramUserRecordId: string; displayName: string } | null> {
+  const { data, error } = await supabase
+    .from("taskgoblin_project_members")
+    .select("telegram_user_id, display_name")
+    .eq("project_id", projectId)
+    .eq("telegram_user_id", telegramUserRecordId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Could not load project member: ${error.message}`);
+  }
+  if (!data) return null;
+  return {
+    telegramUserRecordId: data.telegram_user_id as string,
+    displayName: (data.display_name as string | null)?.trim() || "this member",
+  };
+}
+
+export async function createBulkAssignmentCandidate(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  sourceMessage: PersistedTelegramMessage,
+  owner: { telegramUserRecordId: string; displayName: string },
+): Promise<PersistedBulkAssignmentCandidate> {
+  if (!context.projectId) {
+    throw new Error("Cannot assign tasks without a project.");
+  }
+  const { data: tasks, error: taskError } = await supabase
+    .from("taskgoblin_tasks")
+    .select("id")
+    .eq("project_id", context.projectId)
+    .neq("status", "done")
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (taskError) {
+    throw new Error(`Could not load active tasks: ${taskError.message}`);
+  }
+  const taskIds = (tasks ?? []).map((task) => task.id as string);
+  if (!taskIds.length) {
+    throw new Error("This project has no active confirmed tasks to assign.");
+  }
+
+  const { data, error } = await supabase
+    .from("taskgoblin_bulk_assignment_candidates")
+    .insert({
+      project_id: context.projectId,
+      source_telegram_message_id: sourceMessage.id,
+      target_owner_telegram_user_id: owner.telegramUserRecordId,
+      target_owner_display_name: owner.displayName,
+      task_ids: taskIds,
+      state: "detected",
+    })
+    .select("id, target_owner_display_name, task_ids")
+    .single();
+  if (error || !data) {
+    throw new Error(
+      `Could not create bulk assignment candidate: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+  const candidate = {
+    id: data.id as string,
+    targetOwnerDisplayName: data.target_owner_display_name as string,
+    taskCount: (data.task_ids as string[]).length,
+  };
+  const { error: queueError } = await supabase.rpc(
+    "taskgoblin_transition_bulk_assignment_candidate",
+    {
+      p_candidate_id: candidate.id,
+      p_project_id: context.projectId,
+      p_action: "queue",
+      p_reviewer_telegram_user_id: null,
+    },
+  );
+  if (queueError) {
+    throw new Error(
+      `Could not queue bulk assignment candidate: ${queueError.message}`,
+    );
+  }
+  return candidate;
+}
+
+export async function reviewBulkAssignmentCandidate(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  candidateId: string,
+  action: "confirm" | "ignore",
+): Promise<BulkAssignmentReviewResult> {
+  if (!context.projectId) {
+    throw new Error("Bulk assignment candidate has no project.");
+  }
+  const { data, error } = await supabase.rpc(
+    "taskgoblin_transition_bulk_assignment_candidate",
+    {
+      p_candidate_id: candidateId,
+      p_project_id: context.projectId,
+      p_action: action,
+      p_reviewer_telegram_user_id: context.userRecordId,
+    },
+  );
+  if (error || !Array.isArray(data) || data.length !== 1) {
+    throw new Error(
+      `Could not review bulk assignment: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+  const row = data[0] as {
+    candidate_id: string;
+    candidate_state: "confirmed" | "ignored";
+    target_owner_display_name: string;
+    assigned_task_count: number;
+  };
+  return {
+    candidateId: row.candidate_id,
+    state: row.candidate_state,
+    targetOwnerDisplayName: row.target_owner_display_name,
+    assignedTaskCount: Number(row.assigned_task_count),
+  };
 }
 
 export async function getTelegramProject(

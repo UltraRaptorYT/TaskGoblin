@@ -21,6 +21,11 @@ export type ProjectNameCallback = {
   candidateId: string;
 };
 
+export type BulkAssignmentCallback = {
+  action: "confirm" | "ignore";
+  candidateId: string;
+};
+
 const CALLBACK_PATTERN =
   /^tg:c:(confirm|edit|ignore):([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
 const PROJECT_EVENT_CALLBACK_PATTERN =
@@ -30,6 +35,8 @@ const CANDIDATE_BATCH_CALLBACK_PATTERN =
   /^tg:b:(confirm|ignore):([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
 const PROJECT_NAME_CALLBACK_PATTERN =
   /^tg:n:(confirm|ignore):([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+const BULK_ASSIGNMENT_CALLBACK_PATTERN =
+  /^tg:a:(confirm|ignore):([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
 
 export function candidateCallbackData(
   action: CandidateCallbackAction,
@@ -120,6 +127,25 @@ export function parseProjectNameCallbackData(
   if (!match) return null;
   return {
     action: match[1].toLowerCase() as ProjectNameCallback["action"],
+    candidateId: match[2].toLowerCase(),
+  };
+}
+
+export function bulkAssignmentCallbackData(
+  action: BulkAssignmentCallback["action"],
+  candidateId: string,
+) {
+  return `tg:a:${action}:${candidateId}`;
+}
+
+export function parseBulkAssignmentCallbackData(
+  value: string | null,
+): BulkAssignmentCallback | null {
+  if (!value || value.length > 64) return null;
+  const match = value.match(BULK_ASSIGNMENT_CALLBACK_PATTERN);
+  if (!match) return null;
+  return {
+    action: match[1].toLowerCase() as BulkAssignmentCallback["action"],
     candidateId: match[2].toLowerCase(),
   };
 }

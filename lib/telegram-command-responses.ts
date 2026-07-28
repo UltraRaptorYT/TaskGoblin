@@ -2,6 +2,7 @@ import { taskViewCallbackData } from "@/lib/telegram-callbacks";
 import type { TelegramInlineKeyboard } from "@/lib/telegram-bot";
 import { telegramProjectDashboardUrl } from "@/lib/telegram-links";
 import type {
+  ProjectSummaryKnowledge,
   TelegramProjectRow,
   TelegramTaskRow,
   TelegramUserTaskRow,
@@ -15,8 +16,17 @@ export type TelegramCommandResponse = {
 export function summaryResponse(
   project: TelegramProjectRow,
   tasks: TelegramTaskRow[],
-  now = new Date(),
+  knowledgeOrNow: ProjectSummaryKnowledge | Date = {
+    documentNames: [],
+    recentEvents: [],
+  },
+  requestedNow = new Date(),
 ): TelegramCommandResponse {
+  const knowledge =
+    knowledgeOrNow instanceof Date
+      ? { documentNames: [], recentEvents: [] }
+      : knowledgeOrNow;
+  const now = knowledgeOrNow instanceof Date ? knowledgeOrNow : requestedNow;
   const done = tasks.filter((task) => task.status === "done");
   const active = tasks.filter((task) => task.status !== "done");
   const progress = tasks.length
@@ -37,6 +47,20 @@ export function summaryResponse(
   return {
     text: [
       `📌 ${project.name} Summary`,
+      "",
+      "What TaskGoblin knows:",
+      `Goal: ${project.description?.trim() || "No project goal has been confirmed yet."}`,
+      `Reference documents: ${
+        knowledge.documentNames.length
+          ? knowledge.documentNames.join(", ")
+          : "None processed yet"
+      }`,
+      "Recent confirmed project events:",
+      ...(knowledge.recentEvents.length
+        ? knowledge.recentEvents
+            .slice(0, 5)
+            .map((event) => `• ${event.title}`)
+        : ["None recorded yet"]),
       "",
       "Progress:",
       `${progress}% completed (${done.length}/${tasks.length} confirmed tasks)`,

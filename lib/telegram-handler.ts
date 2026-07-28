@@ -8,6 +8,7 @@ import {
   type TelegramSendOptions,
 } from "@/lib/telegram-bot";
 import {
+  parseBulkAssignmentCallbackData,
   parseCandidateBatchCallbackData,
   parseCandidateCallbackData,
   parseProjectEventCandidateCallbackData,
@@ -40,18 +41,22 @@ import {
   failTelegramUpdate,
   getTaskForTelegramContext,
   getTelegramProject,
+  loadProjectSummaryKnowledge,
   linkPersistedTelegramMessageToProject,
   listProjectTasks,
   listTelegramUserTasks,
   persistTelegramProjectDocument,
   persistTelegramMessage,
   reviewAgentTaskCandidateBatch,
+  reviewBulkAssignmentCandidate,
   reviewProjectNameCandidate,
   reviewProjectEventCandidate,
   reviewTaskCandidate,
   resolvePrivateReminderReplyContext,
+  resolveRecentPrivateReminderContext,
   updatePersistedTelegramMessageText,
   type CandidateBatchReviewResult,
+  type BulkAssignmentReviewResult,
   type CandidateReviewResult,
   type PersistedProjectEventCandidate,
   type ProjectEventCandidateReviewResult,
@@ -68,6 +73,7 @@ import {
 import { detectAndPersistProjectEvent } from "@/lib/telegram-event-pipeline";
 import { shouldInvokeTelegramProjectAgent } from "@/lib/telegram-project-agent";
 import { answerTelegramProjectRequest } from "@/lib/telegram-project-agent-pipeline";
+import { handleExplicitTelegramProjectAction } from "@/lib/telegram-project-actions";
 import {
   telegramBotAddedReply,
   telegramOnboardingReply,
@@ -215,15 +221,21 @@ export async function processTelegramUpdate(
         !onboardingReply &&
         !documentFailed &&
         update.chat.type === "private" &&
-        update.replyToMessageId &&
         context.userRecordId
       ) {
-        const replyContext = await resolvePrivateReminderReplyContext(
-          supabase,
-          context.userRecordId,
-          update.chat.id,
-          update.replyToMessageId,
-        );
+        const replyContext = update.replyToMessageId
+          ? await resolvePrivateReminderReplyContext(
+              supabase,
+              context.userRecordId,
+              update.chat.id,
+              update.replyToMessageId,
+            )
+          : await resolveRecentPrivateReminderContext(
+              supabase,
+              context.userRecordId,
+              update.chat.id,
+              update.sentAt,
+            );
         if (replyContext) {
           effectiveContext = {
             ...context,
@@ -250,6 +262,20 @@ export async function processTelegramUpdate(
         detectionMessage = batch.message;
         supersededByRapidMessage = batch.superseded;
       }
+
+      const explicitProjectAction =
+        !command &&
+        !onboardingReply &&
+        !documentFailed &&
+        !supersededByRapidMessage &&
+        effectiveContext.projectId
+          ? await handleExplicitTelegramProjectAction(
+              supabase,
+              effectiveContext,
+              persistedMessage,
+              detectionMessage,
+            )
+          : null;
 
       if (onboardingReply) {
         const delivery = await gateway.sendMessage(
@@ -278,6 +304,16 @@ export async function processTelegramUpdate(
         replySent = delivery.sent;
       } else if (supersededByRapidMessage) {
         // The newest message in this burst will process the combined text.
+      } else if (explicitProjectAction) {
+        const delivery = await gateway.sendMessage(
+          update.chat.id,
+          explicitProjectAction.text,
+          {
+            replyToMessageId: update.messageId,
+            replyMarkup: explicitProjectAction.replyMarkup,
+          },
+        );
+        replySent = delivery.sent;
       } else if (
         effectiveContext.projectId &&
         shouldInvokeTelegramProjectAgent(
@@ -353,6 +389,7 @@ export async function processTelegramUpdate(
       }
     } else {
       const taskView = parseTaskViewCallbackData(update.data);
+      const bulkAssignment = parseBulkAssignmentCallbackData(update.data);
       const taskBatch = parseCandidateBatchCallbackData(update.data);
       const projectName = parseProjectNameCallbackData(update.data);
       const isProjectEvent = Boolean(
@@ -365,6 +402,19 @@ export async function processTelegramUpdate(
             loadTask: (taskId) =>
               getTaskForTelegramContext(supabase, context, taskId),
           })
+        : bulkAssignment
+          ? await handleBulkAssignmentCallback(update, context, {
+              answerCallback: gateway.answerCallback,
+              clearKeyboard: gateway.clearKeyboard,
+              sendMessage: gateway.sendMessage,
+              reviewCandidate: (candidateId, action) =>
+                reviewBulkAssignmentCandidate(
+                  supabase,
+                  context,
+                  candidateId,
+                  action,
+                ),
+            })
         : taskBatch
           ? await handleCandidateBatchCallback(update, context, {
               answerCallback: gateway.answerCallback,
@@ -422,6 +472,61 @@ export async function processTelegramUpdate(
     await failTelegramUpdate(supabase, update.updateId, message);
     throw error;
   }
+}
+
+export type BulkAssignmentCallbackDependencies = {
+  answerCallback: (
+    callbackQueryId: string,
+    text?: string,
+  ) => Promise<TelegramDelivery>;
+  clearKeyboard: (
+    chatId: string | number,
+    messageId: number,
+  ) => Promise<TelegramDelivery>;
+  sendMessage: (
+    chatId: string | number,
+    text: string,
+  ) => Promise<TelegramDelivery>;
+  reviewCandidate: (
+    candidateId: string,
+    action: "confirm" | "ignore",
+  ) => Promise<BulkAssignmentReviewResult>;
+};
+
+export async function handleBulkAssignmentCallback(
+  update: TelegramInboundCallback,
+  context: TelegramContext,
+  dependencies: BulkAssignmentCallbackDependencies,
+) {
+  const callback = parseBulkAssignmentCallbackData(update.data);
+  if (!callback || !update.chat || !context.projectId) {
+    await dependencies.answerCallback(
+      update.callbackQueryId,
+      "This bulk assignment is invalid or expired.",
+    );
+    return { handled: false, replySent: false };
+  }
+
+  const reviewed = await dependencies.reviewCandidate(
+    callback.candidateId,
+    callback.action,
+  );
+  await dependencies.answerCallback(
+    update.callbackQueryId,
+    reviewed.state === "confirmed"
+      ? `${reviewed.assignedTaskCount} tasks assigned.`
+      : "Bulk assignment cancelled.",
+  );
+  if (update.messageId) {
+    await dependencies.clearKeyboard(update.chat.id, update.messageId);
+  }
+  const delivery = await dependencies.sendMessage(
+    update.chat.id,
+    reviewed.state === "confirmed"
+      ? `Assigned ${reviewed.assignedTaskCount} active tasks to ${reviewed.targetOwnerDisplayName}.`
+      : `Cancelled assigning all tasks to ${reviewed.targetOwnerDisplayName}.`,
+  );
+  return { handled: true, replySent: delivery.sent, review: reviewed };
 }
 
 export type CandidateBatchCallbackDependencies = {
@@ -724,7 +829,13 @@ async function routeTelegramCommand(
     getTelegramProject(supabase, context.projectId),
     listProjectTasks(supabase, context.projectId),
   ]);
-  if (command === "summary") return summaryResponse(project, tasks);
+  if (command === "summary") {
+    const knowledge = await loadProjectSummaryKnowledge(
+      supabase,
+      context.projectId,
+    );
+    return summaryResponse(project, tasks, knowledge);
+  }
   if (command === "project") return projectResponse(project, tasks);
   if (command === "kpi") return kpiResponse(project, tasks);
   if (command === "tasks") return tasksResponse(project, tasks);

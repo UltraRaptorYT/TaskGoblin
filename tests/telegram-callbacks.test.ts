@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  bulkAssignmentCallbackData,
   candidateBatchCallbackData,
   candidateCallbackData,
+  parseBulkAssignmentCallbackData,
   parseCandidateBatchCallbackData,
   parseCandidateCallbackData,
   parseProjectEventCandidateCallbackData,
@@ -13,6 +15,7 @@ import {
   taskViewCallbackData,
 } from "@/lib/telegram-callbacks";
 import {
+  handleBulkAssignmentCallback,
   handleCandidateBatchCallback,
   handleCandidateCallback,
   handleProjectEventCandidateCallback,
@@ -63,6 +66,63 @@ describe("candidate callbacks", () => {
       candidateId,
     });
     expect(parseCandidateCallbackData(batch)).toBeNull();
+  });
+
+  it("round-trips and applies a bulk assignment confirmation", async () => {
+    const data = bulkAssignmentCallbackData("confirm", candidateId);
+    expect(parseBulkAssignmentCallbackData(data)).toEqual({
+      action: "confirm",
+      candidateId,
+    });
+    const update: TelegramInboundCallback = {
+      kind: "callback_query",
+      updateId: 15,
+      updateType: "callback_query",
+      callbackQueryId: "callback-15",
+      data,
+      chat: { id: -100, type: "supergroup", title: "Project", username: null },
+      actor: {
+        id: 42,
+        isBot: false,
+        firstName: "Alex",
+        lastName: null,
+        username: "alex",
+        languageCode: null,
+      },
+      messageId: 105,
+      raw: {},
+    };
+    const answerCallback = vi.fn().mockResolvedValue({ sent: true });
+    const clearKeyboard = vi.fn().mockResolvedValue({ sent: true });
+    const sendMessage = vi.fn().mockResolvedValue({ sent: true });
+    const reviewCandidate = vi.fn().mockResolvedValue({
+      candidateId,
+      state: "confirmed",
+      targetOwnerDisplayName: "Hong Yu",
+      assignedTaskCount: 17,
+    });
+
+    const result = await handleBulkAssignmentCallback(
+      update,
+      {
+        chatRecordId: "chat-1",
+        userRecordId: "user-1",
+        projectId: "project-1",
+        displayName: "Alex",
+      },
+      { answerCallback, clearKeyboard, sendMessage, reviewCandidate },
+    );
+
+    expect(reviewCandidate).toHaveBeenCalledWith(candidateId, "confirm");
+    expect(answerCallback).toHaveBeenCalledWith(
+      "callback-15",
+      "17 tasks assigned.",
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      -100,
+      "Assigned 17 active tasks to Hong Yu.",
+    );
+    expect(result).toMatchObject({ handled: true, replySent: true });
   });
 
   it("reviews the candidate, acknowledges Telegram, and clears the keyboard", async () => {

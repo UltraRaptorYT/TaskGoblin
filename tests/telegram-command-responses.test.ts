@@ -44,10 +44,24 @@ describe("Telegram project command responses", () => {
     const response = summaryResponse(
       project,
       tasks,
+      {
+        documentNames: ["assignment.pdf"],
+        recentEvents: [
+          {
+            eventType: "decision",
+            title: "Use PostgreSQL for the project database",
+          },
+        ],
+      },
       new Date("2026-07-28T00:00:00.000Z"),
     );
 
     expect(response.text).toContain("📌 Website Launch Summary");
+    expect(response.text).toContain("Goal: Ship the TaskGoblin website.");
+    expect(response.text).toContain("Reference documents: assignment.pdf");
+    expect(response.text).toContain(
+      "Use PostgreSQL for the project database",
+    );
     expect(response.text).toContain("20% completed (1/5 confirmed tasks)");
     expect(response.text).toContain("Frontend implementation");
     expect(response.text).toContain("Waiting for credentials");
