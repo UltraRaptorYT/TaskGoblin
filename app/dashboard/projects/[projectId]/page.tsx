@@ -96,12 +96,14 @@ export default async function ProjectPage({
 
       <section className="grid gap-4 py-7 sm:grid-cols-2 lg:grid-cols-4">
         {([
-          ["Members", project.memberCount, Users],
-          ["Your tasks", project.assignedTaskCount, CheckCircle2],
-          ["Needs review", project.pendingReviewCount, Clock3],
-          ["Health", project.healthLabel, ShieldCheck],
-        ] satisfies Array<[string, string | number, LucideIcon]>).map(
-          ([label, value, MetricIcon]) => {
+          ["Members", project.memberCount, Users, null],
+          ["Your tasks", project.assignedTaskCount, CheckCircle2, null],
+          ["Needs review", project.pendingReviewCount, Clock3, null],
+          ["Health", project.healthLabel, ShieldCheck, project.healthReason],
+        ] satisfies Array<
+          [string, string | number, LucideIcon, string | null]
+        >).map(
+          ([label, value, MetricIcon, detail]) => {
             return (
               <div
                 key={label}
@@ -112,6 +114,11 @@ export default async function ProjectPage({
                 <p className="mt-1 text-2xl font-black tracking-[-.03em]">
                   {value}
                 </p>
+                {detail ? (
+                  <p className="mt-2 text-[11px] leading-4 text-[#91a096]">
+                    {detail}
+                  </p>
+                ) : null}
               </div>
             );
           },

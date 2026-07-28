@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { calculateProjectHealth } from "@/lib/project-health";
 import { syncTelegramProjectMemberRole } from "@/lib/telegram-membership";
 
 export type TelegramProjectSummary = {
@@ -9,6 +10,7 @@ export type TelegramProjectSummary = {
   description: string | null;
   healthScore: number;
   healthLabel: string;
+  healthReason: string;
   timezone: string;
   chatTitle: string | null;
   chatType: string | null;
@@ -94,7 +96,7 @@ export async function getTelegramDashboardData(
         .in("project_id", projectIds),
       admin
         .from("taskgoblin_tasks")
-        .select("project_id, status, owner_telegram_user_id")
+        .select("project_id, status, due_at, owner_telegram_user_id")
         .in("project_id", projectIds),
       admin
         .from("taskgoblin_project_event_candidates")
@@ -130,12 +132,23 @@ export async function getTelegramDashboardData(
   const projects: TelegramProjectSummary[] = (projectsResult.data ?? [])
     .map((project) => {
       const chat = chatByProject.get(project.id);
+      const projectTasks = tasks.filter(
+        (task) => task.project_id === project.id,
+      );
+      const health = calculateProjectHealth(
+        projectTasks.map((task) => ({
+          status: task.status,
+          dueAt: task.due_at,
+          ownerTelegramUserId: task.owner_telegram_user_id,
+        })),
+      );
       return {
         id: project.id,
         name: project.name,
         description: project.description,
-        healthScore: Number(project.health_score),
-        healthLabel: project.health_label,
+        healthScore: health.score,
+        healthLabel: health.label,
+        healthReason: health.reason,
         timezone: project.timezone,
         chatTitle: chat?.title ?? null,
         chatType: chat?.chat_type ?? null,
@@ -275,6 +288,13 @@ export async function getTelegramProjectDetail(
       : null,
   }));
   const completedTaskCount = tasks.filter((task) => task.status === "done").length;
+  const health = calculateProjectHealth(
+    tasks.map((task) => ({
+      status: task.status,
+      dueAt: task.dueAt,
+      ownerTelegramUserId: task.ownerTelegramUserId,
+    })),
+  );
   const assignedTaskCount = (tasksResult.data ?? []).filter(
     (task) => task.owner_telegram_user_id === telegramUserRecordId,
   ).length;
@@ -283,8 +303,9 @@ export async function getTelegramProjectDetail(
     id: projectResult.data.id,
     name: projectResult.data.name,
     description: projectResult.data.description,
-    healthScore: Number(projectResult.data.health_score),
-    healthLabel: projectResult.data.health_label,
+    healthScore: health.score,
+    healthLabel: health.label,
+    healthReason: health.reason,
     timezone: projectResult.data.timezone,
     chatTitle: chatResult.data?.title ?? null,
     chatType: chatResult.data?.chat_type ?? null,

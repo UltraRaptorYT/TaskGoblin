@@ -8,9 +8,11 @@ import {
   GripVertical,
   List,
   Pencil,
+  Plus,
   Save,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import type { TelegramProjectTask } from "@/lib/telegram-web-data";
@@ -31,7 +33,7 @@ type ProjectTaskWorkspaceProps = {
 type ViewMode = "list" | "board" | "calendar";
 
 type EditorDraft = {
-  id: string;
+  id: string | null;
   title: string;
   description: string;
   status: string;
@@ -57,6 +59,7 @@ export function ProjectTaskWorkspace({
   members,
   canEdit,
 }: ProjectTaskWorkspaceProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [view, setView] = useState<ViewMode>("board");
   const [editor, setEditor] = useState<EditorDraft | null>(null);
@@ -93,6 +96,40 @@ export function ProjectTaskWorkspace({
     });
   }
 
+  function openCreate() {
+    if (!canEdit) return;
+    setError(null);
+    setEditor({
+      id: null,
+      title: "",
+      description: "",
+      status: "backlog",
+      priority: "medium",
+      ownerTelegramUserId: "",
+      dueAt: "",
+    });
+  }
+
+  async function createTask(input: Record<string, string | null>) {
+    setError(null);
+    const response = await fetch(
+      `/api/dashboard/projects/${projectId}/tasks`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    const payload = (await response.json().catch(() => null)) as
+      | { task?: TelegramProjectTask; error?: string }
+      | null;
+    if (!response.ok || !payload?.task) {
+      throw new Error(payload?.error ?? "Task creation failed.");
+    }
+    setTasks((current) => [payload.task!, ...current]);
+    router.refresh();
+  }
+
   async function updateTask(
     taskId: string,
     patch: Record<string, string | null>,
@@ -115,13 +152,14 @@ export function ProjectTaskWorkspace({
     setTasks((current) =>
       current.map((task) => (task.id === taskId ? payload.task! : task)),
     );
+    router.refresh();
   }
 
   async function saveEditor() {
     if (!editor || !canEdit) return;
     setSaving(true);
     try {
-      await updateTask(editor.id, {
+      const input = {
         title: editor.title,
         description: editor.description || null,
         status: editor.status,
@@ -130,7 +168,12 @@ export function ProjectTaskWorkspace({
         dueAt: editor.dueAt
           ? new Date(editor.dueAt).toISOString()
           : null,
-      });
+      };
+      if (editor.id) {
+        await updateTask(editor.id, input);
+      } else {
+        await createTask(input);
+      }
       setEditor(null);
     } catch (saveError) {
       setError(
@@ -175,28 +218,40 @@ export function ProjectTaskWorkspace({
               : "Read-only view. Telegram group owners and admins can make changes."}
           </p>
         </div>
-        <div className="flex rounded-xl border border-white/10 bg-black/15 p-1">
-          {(
-            [
-              ["list", "List", List],
-              ["board", "Kanban", Columns3],
-              ["calendar", "Calendar", CalendarDays],
-            ] as const
-          ).map(([id, label, Icon]) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit ? (
             <button
-              key={id}
               type="button"
-              onClick={() => setView(id)}
-              className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition ${
-                view === id
-                  ? "bg-[#dfff64] text-[#173d2b]"
-                  : "text-[#aabbb0] hover:bg-white/8 hover:text-white"
-              }`}
+              onClick={openCreate}
+              className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#dfff64] px-3.5 py-2.5 text-xs font-black text-[#173d2b] transition hover:bg-[#e8ff8f]"
             >
-              <Icon className="size-3.5" />
-              {label}
+              <Plus className="size-4" strokeWidth={3} />
+              New task
             </button>
-          ))}
+          ) : null}
+          <div className="flex rounded-xl border border-white/10 bg-black/15 p-1">
+            {(
+              [
+                ["list", "List", List],
+                ["board", "Kanban", Columns3],
+                ["calendar", "Calendar", CalendarDays],
+              ] as const
+            ).map(([id, label, Icon]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setView(id)}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition ${
+                  view === id
+                    ? "bg-[#dfff64] text-[#173d2b]"
+                    : "text-[#aabbb0] hover:bg-white/8 hover:text-white"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -571,13 +626,13 @@ function TaskEditor({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[.12em] text-[#dfff64]">
-              Admin edit
+              {draft.id ? "Admin edit" : "Admin create"}
             </p>
             <h3
               id="task-editor-title"
               className="mt-1 text-2xl font-black tracking-[-.035em]"
             >
-              Update task
+              {draft.id ? "Update task" : "Create task"}
             </h3>
           </div>
           <button
@@ -694,7 +749,11 @@ function TaskEditor({
             className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#dfff64] px-5 py-3 text-sm font-black text-[#173d2b] transition hover:bg-[#e8ff8f] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save className="size-4" />
-            {saving ? "Saving…" : "Save changes"}
+            {saving
+              ? "Saving…"
+              : draft.id
+                ? "Save changes"
+                : "Create task"}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock3,
+  FileText,
   FolderKanban,
   ListTodo,
   MessageCircle,
@@ -62,6 +63,34 @@ export default async function DashboardPage() {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="grid gap-4 border-b border-white/10 py-7 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[.14em] text-[#dfff64]">
+            What TaskGoblin does
+          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#b7c6bc]">
+            TaskGoblin turns project conversations into reviewable tasks,
+            owners, deadlines, decisions, and reminders—then gives the team a
+            visual workspace without exposing raw chat history.
+          </p>
+        </div>
+        <Link
+          href="/legacy"
+          className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.045] px-4 py-3 transition hover:border-[#dfff64]/35 hover:bg-white/[.07]"
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/10 text-[#dfff64]">
+            <FileText className="size-4" />
+          </span>
+          <span>
+            <span className="block text-xs font-black">Import a project brief</span>
+            <span className="mt-0.5 block text-[11px] text-[#91a096]">
+              PDF, DOCX, TXT, or MD · separate imported project
+            </span>
+          </span>
+          <ArrowUpRight className="size-4 text-[#91a096]" />
+        </Link>
       </section>
 
       <section
