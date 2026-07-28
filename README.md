@@ -34,9 +34,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_EVENT_MODEL=gpt-5.6-sol
+OPENAI_AGENT_MODEL=gpt-5.6-sol
 OPENAI_SCAN_MODEL=gpt-5.6-terra
 OPENAI_REMINDER_MODEL=gpt-5.6-luna
 TELEGRAM_EVENT_DETECTION_MODE=openai
+TELEGRAM_PROJECT_AGENT_MODE=openai
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEBHOOK_SECRET=
 TELEGRAM_BOT_USERNAME=
@@ -134,12 +136,21 @@ detector uses no provider calls and is evaluated against the held-out fixture
 set with `npm run test:evaluate`. With a provider key configured, run
 `npm run test:evaluate:openai` to measure the real Structured Outputs path.
 
+Set `TELEGRAM_PROJECT_AGENT_MODE=openai` to answer project questions through a
+bounded OpenAI tool loop. In groups, the agent responds when TaskGoblin is
+mentioned or replied to, and to clear project-planning requests such as "what
+else needs to be done?" It can read confirmed tasks, members, recent chat, and
+extracted project documents. Its tools are read-only; project state changes
+continue through the candidate confirmation flow. If the agent mode is omitted,
+it inherits `TELEGRAM_EVENT_DETECTION_MODE`.
+
 OpenAI is also the single provider for legacy import scans and generated
 reminders. The defaults are role-specific: Sol for high-signal Telegram event
-detection, Terra for document/chat extraction, and Luna for short reminder
-copy. Override them independently with `OPENAI_EVENT_MODEL`,
-`OPENAI_SCAN_MODEL`, and `OPENAI_REMINDER_MODEL`. Import scanning falls back to
-the mock scanner without a key; reminders fall back to deterministic templates.
+detection and project-agent reasoning, Terra for document/chat extraction, and
+Luna for short reminder copy. Override them independently with
+`OPENAI_EVENT_MODEL`, `OPENAI_AGENT_MODEL`, `OPENAI_SCAN_MODEL`, and
+`OPENAI_REMINDER_MODEL`. Import scanning falls back to the mock scanner without
+a key; reminders fall back to deterministic templates.
 
 The model can propose task creation, assignment, progress, completion,
 deadline, blocker and decision events. Application code validates owner

@@ -25,6 +25,9 @@ const repository = vi.hoisted(() => ({
 const eventPipeline = vi.hoisted(() => ({
   detectAndPersistProjectEvent: vi.fn(),
 }));
+const projectAgentPipeline = vi.hoisted(() => ({
+  answerTelegramProjectRequest: vi.fn(),
+}));
 const telegramDocument = vi.hoisted(() => ({
   displayFilename: vi.fn(() => "assignment.txt"),
   documentMessageText: vi.fn(
@@ -38,6 +41,7 @@ const telegramDocument = vi.hoisted(() => ({
 
 vi.mock("@/lib/telegram-repository", () => repository);
 vi.mock("@/lib/telegram-event-pipeline", () => eventPipeline);
+vi.mock("@/lib/telegram-project-agent-pipeline", () => projectAgentPipeline);
 vi.mock("@/lib/telegram-document", () => telegramDocument);
 
 const baseMessage: TelegramInboundMessage = {
@@ -79,6 +83,13 @@ describe("processTelegramUpdate onboarding", () => {
     repository.updatePersistedTelegramMessageText.mockResolvedValue(undefined);
     repository.completeTelegramUpdate.mockResolvedValue(undefined);
     eventPipeline.detectAndPersistProjectEvent.mockResolvedValue(null);
+    projectAgentPipeline.answerTelegramProjectRequest.mockResolvedValue({
+      provider: "openai",
+      model: "test-agent",
+      text: "The report and demonstration still need to be planned.",
+      toolsUsed: ["get_project_documents", "get_project_tasks"],
+      fallback: false,
+    });
     telegramDocument.extractTelegramDocument.mockResolvedValue({
       filename: "assignment.txt",
       extension: "txt",
@@ -226,6 +237,34 @@ describe("processTelegramUpdate onboarding", () => {
       expect.stringContaining("added it to this project's context"),
       { replyToMessageId: 2 },
     );
+  });
+
+  it("answers project planning requests through the bounded agent", async () => {
+    const gateway = gatewayMock();
+    const update = {
+      ...baseMessage,
+      text: "what else needs to be done?",
+    };
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      update,
+      gateway,
+    );
+
+    expect(
+      projectAgentPipeline.answerTelegramProjectRequest,
+    ).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ projectId: "project-1" }),
+      update,
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      expect.stringContaining("report and demonstration"),
+      { replyToMessageId: 2 },
+    );
+    expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
   });
 
   it("lists the member's tasks across projects in a private chat", async () => {

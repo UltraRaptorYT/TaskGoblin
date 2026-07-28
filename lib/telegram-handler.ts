@@ -56,6 +56,8 @@ import {
   extractTelegramDocument,
 } from "@/lib/telegram-document";
 import { detectAndPersistProjectEvent } from "@/lib/telegram-event-pipeline";
+import { shouldInvokeTelegramProjectAgent } from "@/lib/telegram-project-agent";
+import { answerTelegramProjectRequest } from "@/lib/telegram-project-agent-pipeline";
 import {
   telegramBotAddedReply,
   telegramOnboardingReply,
@@ -219,6 +221,26 @@ export async function processTelegramUpdate(
           },
         );
         replySent = delivery.sent;
+      } else if (
+        context.projectId &&
+        shouldInvokeTelegramProjectAgent(
+          detectionMessage,
+          process.env.TELEGRAM_BOT_USERNAME,
+        )
+      ) {
+        const response = await answerTelegramProjectRequest(
+          supabase,
+          context,
+          detectionMessage,
+        );
+        if (response) {
+          const delivery = await gateway.sendMessage(
+            update.chat.id,
+            response.text,
+            { replyToMessageId: update.messageId },
+          );
+          replySent = delivery.sent;
+        }
       } else if (
         !documentFailed &&
         !isTelegramCommandLike(detectionMessage.text) &&
