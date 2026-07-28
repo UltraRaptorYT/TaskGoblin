@@ -78,6 +78,49 @@ describe("normalizeTelegramUpdate", () => {
     ]);
   });
 
+  it("normalizes the reliable my_chat_member bot-added update", () => {
+    const result = normalizeTelegramUpdate({
+      update_id: 60,
+      my_chat_member: {
+        chat: { id: -100123, type: "supergroup", title: "Launch" },
+        from: {
+          id: 42,
+          is_bot: false,
+          first_name: "Alex",
+          username: "alex",
+        },
+        date: 1_700_000_000,
+        old_chat_member: {
+          status: "left",
+          user: {
+            id: 99,
+            is_bot: true,
+            first_name: "TaskGoblin",
+            username: "taskgoblin_launch_bot",
+          },
+        },
+        new_chat_member: {
+          status: "member",
+          user: {
+            id: 99,
+            is_bot: true,
+            first_name: "TaskGoblin",
+            username: "taskgoblin_launch_bot",
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || !result.update || result.update.kind !== "bot_added") {
+      throw new Error("Expected a normalized bot-added update");
+    }
+    expect(result.update.updateType).toBe("my_chat_member");
+    expect(result.update.chat.id).toBe(-100123);
+    expect(result.update.actor.id).toBe(42);
+    expect(result.update.bot.username).toBe("taskgoblin_launch_bot");
+  });
+
   it("normalizes edited captions and callback queries", () => {
     const edited = normalizeTelegramUpdate({
       update_id: 56,

@@ -49,7 +49,10 @@ import {
   type TelegramUserTaskRow,
 } from "@/lib/telegram-repository";
 import { detectAndPersistProjectEvent } from "@/lib/telegram-event-pipeline";
-import { telegramOnboardingReply } from "@/lib/telegram-onboarding";
+import {
+  telegramBotAddedReply,
+  telegramOnboardingReply,
+} from "@/lib/telegram-onboarding";
 import type {
   TelegramInboundCallback,
   TelegramInboundUpdate,
@@ -89,7 +92,16 @@ export async function processTelegramUpdate(
     const context = await ensureTelegramContext(supabase, update);
     let replySent = false;
 
-    if (update.kind === "message") {
+    if (update.kind === "bot_added") {
+      const delivery = await gateway.sendMessage(
+        update.chat.id,
+        telegramBotAddedReply(
+          update.bot,
+          process.env.TELEGRAM_BOT_USERNAME,
+        ),
+      );
+      replySent = delivery.sent;
+    } else if (update.kind === "message") {
       const persistedMessage = await persistTelegramMessage(
         supabase,
         update,
@@ -103,6 +115,7 @@ export async function processTelegramUpdate(
         update,
         context,
         process.env.TELEGRAM_BOT_USERNAME,
+        process.env.TELEGRAM_BOT_TOKEN,
       );
 
       if (onboardingReply) {

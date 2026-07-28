@@ -2,6 +2,9 @@ import { readFile } from "node:fs/promises";
 
 const env = await readLocalEnv();
 const token = process.env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN;
+const appUrl = process.env.TASKGOBLIN_APP_URL || env.TASKGOBLIN_APP_URL;
+const webhookSecret =
+  process.env.TELEGRAM_WEBHOOK_SECRET || env.TELEGRAM_WEBHOOK_SECRET;
 
 if (!token) {
   throw new Error(
@@ -35,7 +38,14 @@ await setCommands(
   ],
 );
 
-console.log("TaskGoblin Telegram command menus configured.");
+if (appUrl && webhookSecret) {
+  await configureWebhook(appUrl, webhookSecret);
+  console.log("TaskGoblin commands and webhook update types configured.");
+} else {
+  console.log(
+    "TaskGoblin command menus configured. Add TASKGOBLIN_APP_URL and TELEGRAM_WEBHOOK_SECRET to configure the webhook too.",
+  );
+}
 
 async function setCommands(scope, commands) {
   const response = await fetch(`${apiUrl}/setMyCommands`, {
@@ -47,6 +57,32 @@ async function setCommands(scope, commands) {
   if (!response.ok || !payload.ok) {
     throw new Error(
       `Telegram setMyCommands failed: ${payload.description ?? response.status}`,
+    );
+  }
+}
+
+async function configureWebhook(rawAppUrl, secretToken) {
+  const webhookUrl = `${rawAppUrl.replace(/\/$/, "")}/api/telegram/webhook`;
+  const response = await fetch(`${apiUrl}/setWebhook`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: webhookUrl,
+      secret_token: secretToken,
+      allowed_updates: [
+        "message",
+        "edited_message",
+        "channel_post",
+        "edited_channel_post",
+        "callback_query",
+        "my_chat_member",
+      ],
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(
+      `Telegram setWebhook failed: ${payload.description ?? response.status}`,
     );
   }
 }

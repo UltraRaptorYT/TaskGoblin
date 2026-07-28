@@ -1,22 +1,30 @@
 import type {
-  TelegramInboundMessage,
+  TelegramActor,
   TelegramChatType,
+  TelegramInboundMessage,
 } from "@/lib/taskgoblin-types";
 import type { TelegramContext } from "@/lib/telegram-repository";
 
 const GROUP_CHAT_TYPES = new Set<TelegramChatType>(["group", "supergroup"]);
-const MEMBER_GREETING_PATTERN = /^(?:hello|hi|hey)(?:\s+@([a-z0-9_]+))?[!.]?$/i;
+const MEMBER_GREETING_PATTERN =
+  /^(?:hello|hi|hey)(?:\s+@([a-z0-9_]+))?[!.]?$/i;
 
 export function telegramOnboardingReply(
   message: TelegramInboundMessage,
   context: TelegramContext,
   configuredBotUsername: string | undefined,
+  configuredBotToken?: string,
 ) {
   if (!GROUP_CHAT_TYPES.has(message.chat.type)) return null;
 
   const botUsername = normalizeUsername(configuredBotUsername);
-  if (botUsername && didBotJoin(message, botUsername)) {
-    return welcomeMessage(botUsername);
+  const joinedBot = findJoinedTaskGoblin(
+    message,
+    botUsername,
+    configuredBotToken,
+  );
+  if (joinedBot) {
+    return telegramBotAddedReply(joinedBot, configuredBotUsername);
   }
 
   if (
@@ -45,14 +53,34 @@ export function telegramOnboardingReply(
   ].join("\n");
 }
 
-function didBotJoin(message: TelegramInboundMessage, botUsername: string) {
-  return message.newChatMembers.some(
+export function telegramBotAddedReply(
+  bot: TelegramActor,
+  configuredBotUsername?: string,
+) {
+  const botUsername =
+    normalizeUsername(bot.username) ?? normalizeUsername(configuredBotUsername);
+  return welcomeMessage(botUsername);
+}
+
+function findJoinedTaskGoblin(
+  message: TelegramInboundMessage,
+  botUsername: string | null,
+  configuredBotToken: string | undefined,
+) {
+  const botId = botIdFromToken(configuredBotToken);
+  return message.newChatMembers.find(
     (member) =>
-      member.isBot && normalizeUsername(member.username) === botUsername,
+      member.isBot &&
+      ((botId !== null && member.id === botId) ||
+        (botUsername !== null &&
+          normalizeUsername(member.username) === botUsername)),
   );
 }
 
-function welcomeMessage(botUsername: string) {
+function welcomeMessage(botUsername: string | null) {
+  const privateSetup = botUsername
+    ? `2. Each member should open @${botUsername} privately and press Start once to receive private reminders.`
+    : "2. Each member should open my private chat and press Start once to receive private reminders.";
   return [
     "👋 Hello! I’m TaskGoblin, the AI project manager for this group.",
     "",
@@ -60,12 +88,19 @@ function welcomeMessage(botUsername: string) {
     "",
     "Quick setup:",
     "1. Each team member should send hello in this group so I can link their Telegram identity.",
-    `2. Each member should open @${botUsername} privately and press Start once to receive private reminders.`,
+    privateSetup,
     "3. Try an explicit assignment, for example:",
     "@alex please prepare the demo by Friday",
     "",
     "Use /help to see commands, /tasks for active work, and /mytasks for your assignments.",
   ].join("\n");
+}
+
+function botIdFromToken(value: string | undefined) {
+  const match = value?.match(/^(\d+):/);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) ? id : null;
 }
 
 function normalizeUsername(value: string | undefined | null) {

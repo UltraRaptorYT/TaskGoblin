@@ -2,7 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { processTelegramUpdate, type TelegramGateway } from "@/lib/telegram-handler";
-import type { TelegramInboundMessage } from "@/lib/taskgoblin-types";
+import type {
+  TelegramInboundBotAdded,
+  TelegramInboundMessage,
+} from "@/lib/taskgoblin-types";
 
 const repository = vi.hoisted(() => ({
   claimTelegramUpdate: vi.fn(),
@@ -96,6 +99,41 @@ describe("processTelegramUpdate onboarding", () => {
       expect.anything(),
       1,
     );
+  });
+
+  it("welcomes a newly created group from my_chat_member", async () => {
+    const gateway = gatewayMock();
+    const update: TelegramInboundBotAdded = {
+      kind: "bot_added",
+      updateId: 4,
+      updateType: "my_chat_member",
+      sentAt: "2026-07-28T00:00:00.000Z",
+      chat: baseMessage.chat,
+      actor: baseMessage.actor!,
+      bot: {
+        id: 99,
+        isBot: true,
+        firstName: "TaskGoblin",
+        lastName: null,
+        username: "taskgoblin_launch_bot",
+        languageCode: null,
+      },
+      raw: {},
+    };
+
+    const result = await processTelegramUpdate(
+      {} as SupabaseClient,
+      update,
+      gateway,
+    );
+
+    expect(result).toEqual({ duplicate: false, replySent: true });
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      expect.stringContaining("Quick setup"),
+    );
+    expect(repository.persistTelegramMessage).not.toHaveBeenCalled();
+    expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
   });
 
   it("acknowledges a linked member greeting without invoking AI", async () => {

@@ -94,6 +94,17 @@ Configure Telegram to send the secret in
 - project-event Confirm, Edit and Ignore callbacks
 - inline task-selection callbacks
 
+After deployment, configure both the command menus and webhook update types:
+
+```bash
+npm run bot:configure
+```
+
+The local environment used for this command must include
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and
+`TASKGOBLIN_APP_URL`. The webhook subscribes to `my_chat_member` so a newly
+added bot can greet and initialise a group immediately.
+
 The welcome asks each team member to say `hello` in the group so TaskGoblin can
 link their Telegram identity to the project. Members must also open the bot
 privately and press Start once before Telegram will allow private reminders.

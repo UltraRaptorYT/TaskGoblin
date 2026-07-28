@@ -178,9 +178,21 @@ export type TelegramInboundCallback = {
   raw: unknown;
 };
 
+export type TelegramInboundBotAdded = {
+  kind: "bot_added";
+  updateId: number;
+  updateType: "my_chat_member";
+  sentAt: string | null;
+  chat: TelegramChat;
+  actor: TelegramActor;
+  bot: TelegramActor;
+  raw: unknown;
+};
+
 export type TelegramInboundUpdate =
   | TelegramInboundMessage
-  | TelegramInboundCallback;
+  | TelegramInboundCallback
+  | TelegramInboundBotAdded;
 
 export type TaskCandidateState =
   | "detected"

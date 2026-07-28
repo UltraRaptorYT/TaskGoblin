@@ -60,6 +60,30 @@ describe("Telegram onboarding", () => {
     expect(reply).toContain("/help");
   });
 
+  it("recognises the bot from its token when the username setting is absent", () => {
+    const reply = telegramOnboardingReply(
+      {
+        ...message,
+        newChatMembers: [
+          {
+            id: 99,
+            isBot: true,
+            firstName: "TaskGoblin",
+            lastName: null,
+            username: "taskgoblin_launch_bot",
+            languageCode: null,
+          },
+        ],
+      },
+      context,
+      undefined,
+      "99:telegram-token",
+    );
+
+    expect(reply).toContain("I’m TaskGoblin");
+    expect(reply).toContain("@taskgoblin_launch_bot");
+  });
+
   it("acknowledges and identifies a member who says hello", () => {
     const reply = telegramOnboardingReply(
       { ...message, text: "hello" },

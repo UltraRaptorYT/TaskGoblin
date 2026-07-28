@@ -4,6 +4,7 @@ import type {
   TelegramActor,
   TelegramChat,
   TelegramChatType,
+  TelegramInboundBotAdded,
   TelegramInboundCallback,
   TelegramInboundMessage,
   TelegramInboundUpdate,
@@ -48,6 +49,23 @@ const telegramCallbackQuerySchema = z.object({
   message: telegramMessageSchema.optional(),
 }).passthrough();
 
+const telegramChatMemberSchema = z
+  .object({
+    status: z.string().min(1),
+    user: telegramUserSchema,
+  })
+  .passthrough();
+
+const telegramChatMemberUpdatedSchema = z
+  .object({
+    chat: telegramChatSchema,
+    from: telegramUserSchema,
+    date: z.number().int().optional(),
+    old_chat_member: telegramChatMemberSchema,
+    new_chat_member: telegramChatMemberSchema,
+  })
+  .passthrough();
+
 const telegramUpdateSchema = z.object({
   update_id: z.number().int(),
   message: telegramMessageSchema.optional(),
@@ -55,6 +73,7 @@ const telegramUpdateSchema = z.object({
   channel_post: telegramMessageSchema.optional(),
   edited_channel_post: telegramMessageSchema.optional(),
   callback_query: telegramCallbackQuerySchema.optional(),
+  my_chat_member: telegramChatMemberUpdatedSchema.optional(),
 }).passthrough();
 
 export type TelegramNormalizationResult =
@@ -80,6 +99,27 @@ export function normalizeTelegramUpdate(
   }
 
   const { update_id: updateId } = parsed.data;
+  if (parsed.data.my_chat_member) {
+    const membership = parsed.data.my_chat_member;
+    if (
+      !isActiveChatMemberStatus(membership.old_chat_member.status) &&
+      isActiveChatMemberStatus(membership.new_chat_member.status)
+    ) {
+      const update: TelegramInboundBotAdded = {
+        kind: "bot_added",
+        updateId,
+        updateType: "my_chat_member",
+        sentAt: unixTimestamp(membership.date),
+        chat: normalizeChat(membership.chat),
+        actor: normalizeActor(membership.from),
+        bot: normalizeActor(membership.new_chat_member.user),
+        raw: payload,
+      };
+      return { ok: true, update };
+    }
+    return { ok: true, update: null };
+  }
+
   if (parsed.data.callback_query) {
     const callback = parsed.data.callback_query;
     const update: TelegramInboundCallback = {
@@ -124,6 +164,10 @@ export function normalizeTelegramUpdate(
   }
 
   return { ok: true, update: null };
+}
+
+function isActiveChatMemberStatus(status: string) {
+  return !["left", "kicked"].includes(status);
 }
 
 function normalizeActor(
