@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { syncTelegramProjectMemberRole } from "@/lib/telegram-membership";
 
 export type TelegramProjectSummary = {
   id: string;
@@ -42,6 +43,7 @@ function requireAdmin() {
 
 export async function getTelegramDashboardData(
   telegramUserRecordId: string,
+  telegramUserId?: string | number,
 ): Promise<TelegramDashboardData> {
   const admin = requireAdmin();
   const { data: membershipData, error: membershipError } = await admin
@@ -55,6 +57,22 @@ export async function getTelegramDashboardData(
 
   if (projectIds.length === 0) {
     return { projects: [], totalTasks: 0, assignedTasks: 0, pendingReviews: 0 };
+  }
+
+  if (telegramUserId) {
+    const syncedRoles = await Promise.all(
+      memberships.map((membership) =>
+        syncTelegramProjectMemberRole(
+          admin,
+          membership.project_id,
+          telegramUserRecordId,
+          telegramUserId,
+        ),
+      ),
+    );
+    syncedRoles.forEach((role, index) => {
+      if (role) memberships[index].role = role;
+    });
   }
 
   const [projectsResult, chatsResult, membersResult, tasksResult, reviewsResult] =
@@ -158,6 +176,7 @@ export type TelegramProjectTask = {
   priority: string;
   dueAt: string | null;
   dueLabel: string | null;
+  ownerTelegramUserId: string | null;
   ownerName: string | null;
 };
 
@@ -169,8 +188,17 @@ export type TelegramProjectDetail = TelegramProjectSummary & {
 export async function getTelegramProjectDetail(
   telegramUserRecordId: string,
   projectId: string,
+  telegramUserId?: string | number,
 ): Promise<TelegramProjectDetail | null> {
   const admin = requireAdmin();
+  if (telegramUserId) {
+    await syncTelegramProjectMemberRole(
+      admin,
+      projectId,
+      telegramUserRecordId,
+      telegramUserId,
+    );
+  }
   const { data: membership, error: membershipError } = await admin
     .from("taskgoblin_project_members")
     .select("project_id, role")
@@ -241,6 +269,7 @@ export async function getTelegramProjectDetail(
     priority: task.priority,
     dueAt: task.due_at,
     dueLabel: task.due_label,
+    ownerTelegramUserId: task.owner_telegram_user_id,
     ownerName: task.owner_telegram_user_id
       ? memberNameById.get(task.owner_telegram_user_id) ?? null
       : null,

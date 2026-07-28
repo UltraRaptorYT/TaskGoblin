@@ -7,7 +7,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BrandMark } from "@/app/_components/taskgoblin/shared";
@@ -55,12 +54,12 @@ export default async function LoginPage({
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-12">
         <header className="flex items-center justify-between">
           <BrandMark dark />
-          <Link
+          {/* <Link
             href="/legacy"
             className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/70 transition hover:border-[#dfff64]/40 hover:text-white"
           >
             Legacy import
-          </Link>
+          </Link> */}
         </header>
 
         <div className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.08fr_.92fr] lg:py-20">

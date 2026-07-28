@@ -30,30 +30,33 @@ export default async function DashboardPage() {
   const identity = await getTelegramWebIdentity();
   if (!identity) redirect("/login");
 
-  const data = await getTelegramDashboardData(identity.telegramUserRecordId);
+  const data = await getTelegramDashboardData(
+    identity.telegramUserRecordId,
+    identity.telegramUserId,
+  );
 
   return (
     <main className="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8 sm:py-14 lg:px-12">
-      <section className="flex flex-col gap-7 border-b border-[#173d2b]/12 pb-10 lg:flex-row lg:items-end lg:justify-between">
+      <section className="flex flex-col gap-7 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-[#66852c]">
+          <p className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-[#dfff64]">
             <Sparkles className="size-4" />
             Telegram workspace
           </p>
           <h1 className="text-4xl font-black tracking-[-.055em] sm:text-5xl">
             Good to see you, {identity.displayName.split(" ")[0]}.
           </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-[#627068]">
+          <p className="mt-3 max-w-2xl text-base leading-7 text-[#aabbb0]">
             These are the live project groups where TaskGoblin has recognised
             your Telegram account.
           </p>
         </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-[#173d2b]/10 bg-white/65 px-4 py-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/12 bg-white/[.055] px-4 py-3">
           <span className="grid size-10 place-items-center rounded-xl bg-[#dfff64] text-[#173d2b]">
             <MessageCircle className="size-5" />
           </span>
           <div>
-            <p className="text-xs font-semibold text-[#778178]">Connected as</p>
+            <p className="text-xs font-semibold text-[#91a096]">Connected as</p>
             <p className="text-sm font-black">
               {identity.username ? `@${identity.username}` : identity.displayName}
             </p>
@@ -76,7 +79,7 @@ export default async function DashboardPage() {
             label: "All tasks",
             value: data.totalTasks,
             icon: ListTodo,
-            accent: "bg-[#e2ddcf] text-[#173d2b]",
+            accent: "bg-white/10 text-[#d7e2da]",
           },
           {
             label: "Assigned to you",
@@ -93,10 +96,10 @@ export default async function DashboardPage() {
         ].map(({ label, value, icon: Icon, accent }) => (
           <div
             key={label}
-            className="rounded-2xl border border-[#173d2b]/10 bg-[#fffdf7] p-5 shadow-sm"
+            className="rounded-2xl border border-white/10 bg-[#102219] p-5 shadow-lg shadow-black/10"
           >
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-[#667168]">{label}</p>
+              <p className="text-sm font-bold text-[#aabbb0]">{label}</p>
               <span className={`grid size-9 place-items-center rounded-xl ${accent}`}>
                 <Icon className="size-4" />
               </span>
@@ -107,7 +110,7 @@ export default async function DashboardPage() {
       </section>
 
       {data.projects.length === 0 ? (
-        <section className="mt-4 overflow-hidden rounded-[1.75rem] border border-[#173d2b]/12 bg-[#173d2b] text-white shadow-[5px_5px_0_#dfff64]">
+        <section className="mt-4 overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#102219] text-white shadow-[5px_5px_0_#dfff64]">
           <div className="grid gap-9 p-7 sm:p-10 lg:grid-cols-[1fr_.8fr] lg:items-center">
             <div>
               <span className="grid size-12 place-items-center rounded-2xl bg-[#dfff64] text-[#173d2b]">
@@ -148,7 +151,7 @@ export default async function DashboardPage() {
               <h2 className="text-2xl font-black tracking-[-.035em]">
                 Your project chats
               </h2>
-              <p className="mt-1 text-sm text-[#6b766f]">
+              <p className="mt-1 text-sm text-[#91a096]">
                 Structured work from the groups you share with TaskGoblin.
               </p>
             </div>
@@ -163,7 +166,7 @@ export default async function DashboardPage() {
                 <Link
                   key={project.id}
                   href={`/dashboard/projects/${project.id}`}
-                  className="group rounded-[1.5rem] border border-[#173d2b]/12 bg-[#fffdf7] p-6 transition hover:-translate-y-1 hover:border-[#66852c]/45 hover:shadow-[5px_5px_0_#173d2b]"
+                  className="group rounded-[1.5rem] border border-white/10 bg-[#102219] p-6 transition hover:-translate-y-1 hover:border-[#dfff64]/40 hover:shadow-[5px_5px_0_#dfff64]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -180,34 +183,34 @@ export default async function DashboardPage() {
                       <h3 className="truncate text-2xl font-black tracking-[-.04em]">
                         {project.name}
                       </h3>
-                      <p className="mt-1 flex items-center gap-1.5 truncate text-sm font-medium text-[#6b766f]">
+                      <p className="mt-1 flex items-center gap-1.5 truncate text-sm font-medium text-[#91a096]">
                         <MessageCircle className="size-3.5 shrink-0" />
                         {project.chatTitle ?? "Telegram project chat"}
                       </p>
                     </div>
-                    <span className="grid size-10 shrink-0 place-items-center rounded-full border border-[#173d2b]/10 transition group-hover:bg-[#173d2b] group-hover:text-[#dfff64]">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-full border border-white/12 text-[#b9c9bf] transition group-hover:bg-[#dfff64] group-hover:text-[#173d2b]">
                       <ArrowUpRight className="size-5" />
                     </span>
                   </div>
-                  <p className="mt-5 line-clamp-2 min-h-12 text-sm leading-6 text-[#5f6d64]">
+                  <p className="mt-5 line-clamp-2 min-h-12 text-sm leading-6 text-[#aabbb0]">
                     {project.description ??
                       "TaskGoblin is organising commitments from this project group."}
                   </p>
                   <div className="mt-6">
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span>{progress}% complete</span>
-                      <span className="text-[#7b857e]">
+                      <span className="text-[#91a096]">
                         {project.completedTaskCount}/{project.taskCount} tasks
                       </span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e4e0d4]">
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-[#66852c]"
+                        className="h-full rounded-full bg-[#dfff64]"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
                   </div>
-                  <div className="mt-5 flex items-center gap-4 border-t border-[#173d2b]/8 pt-4 text-xs font-semibold text-[#6b766f]">
+                  <div className="mt-5 flex items-center gap-4 border-t border-white/8 pt-4 text-xs font-semibold text-[#91a096]">
                     <span className="flex items-center gap-1.5">
                       <Users className="size-3.5" />
                       {project.memberCount} members
