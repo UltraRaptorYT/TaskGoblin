@@ -28,7 +28,9 @@ describe("Telegram web session", () => {
 
   it("rejects tampered and incorrectly signed sessions", async () => {
     const token = await createTelegramWebSession(identity, secret);
-    const tampered = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+    const [header, payload, signature] = token.split(".");
+    const tamperedPayload = `${payload.startsWith("a") ? "b" : "a"}${payload.slice(1)}`;
+    const tampered = `${header}.${tamperedPayload}.${signature}`;
 
     await expect(verifyTelegramWebSession(tampered, secret)).resolves.toBeNull();
     await expect(

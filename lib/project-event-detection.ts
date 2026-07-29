@@ -111,13 +111,19 @@ Event boundaries:
   from nearby names, participation, or a non-committal response. Write the title
   as a concise action grounded in the evidence message and nearby project
   context.
-- blocker may describe a project-level impediment without a matched task.
+- blocker may describe a project-level impediment without a matched task, but
+  the current message must explicitly say work is blocked, stuck, unable to
+  proceed, or waiting on a dependency. A complaint, possible bug, lag report,
+  or observation is not a blocker unless its impact on project work is stated.
 - progress, completion, and deadline updates require a supported task match.
 - deadline_update also includes a task owner committing to complete their
   existing matched task by an explicit deadline, even without words such as
   "deadline", "move", or "reschedule". Telegram shorthand such as "tmr
   morning" is valid. Copy deadlineText verbatim from the message.
 - decision requires explicit decision language, not a preference or idea.
+
+Treat "I can <concrete project action>" as a reviewable task proposal when the
+speaker is a known member. It is still only a candidate until confirmed.
 
 Relative deadlines such as "tomorrow", "next Tuesday", and "in 30 minutes" are
 valid when they appear verbatim. Copy the phrase into deadlineText; do not
@@ -184,22 +190,26 @@ export async function detectProjectEvent(
   }
   const modelOutput = modelProjectEventResponseSchema.parse(parsed).result;
   const validated = validateProjectEvent(modelOutput, message, context);
-  const deterministicDeadline =
-    !validated && isExplicitDeadlineUpdateRequest(message.text)
-      ? validateProjectEvent(
-          detectMockProjectEvent(message, context),
-          message,
-          context,
-        )
-      : null;
+  const deterministicFallback = !validated
+    ? validateProjectEvent(
+        detectMockProjectEvent(message, context),
+        message,
+        context,
+      )
+    : null;
+  const fallbackEvent =
+    deterministicFallback?.eventType === "deadline_update" &&
+    isExplicitDeadlineUpdateRequest(message.text)
+      ? deterministicFallback
+      : deterministicFallback?.eventType === "task_proposal" &&
+          isExplicitFirstPersonTaskProposal(message.text)
+        ? deterministicFallback
+        : null;
   return {
     provider: "openai",
     model,
     modelOutput,
-    event:
-      deterministicDeadline?.eventType === "deadline_update"
-        ? deterministicDeadline
-        : validated,
+    event: fallbackEvent ?? validated,
   };
 }
 
@@ -231,6 +241,12 @@ export function validateProjectEvent(
 ): ValidatedProjectEvent | null {
   if (output.eventType === "none") return null;
   if (output.confidence < MIN_PROJECT_EVENT_CONFIDENCE) return null;
+  if (
+    output.eventType === "blocker" &&
+    !isExplicitBlockerStatement(message.text)
+  ) {
+    return null;
+  }
 
   const matchedTaskId =
     "matchedTaskId" in output
@@ -482,7 +498,7 @@ export function detectMockProjectEvent(
     );
     return {
       eventType: "task_proposal",
-      title: text.slice(0, 240),
+      title: firstPersonProposalTitle(text),
       ownerUsername: sender?.username ?? null,
       deadlineText,
       confidence: 0.82,
@@ -502,7 +518,9 @@ export function detectMockProjectEvent(
     );
     return {
       eventType: "task_proposal",
-      title: text.slice(0, 240),
+      title: isExplicitFirstPersonTaskProposal(lower)
+        ? firstPersonProposalTitle(text)
+        : text.slice(0, 240),
       ownerUsername:
         /\b(?:i will|i'll|i’ll|i can|i commit to|i am going to)\b/i.test(lower)
           ? sender?.username ?? null
@@ -815,6 +833,18 @@ function isExplicitDeadlineUpdateRequest(text: string) {
   );
 }
 
+function isExplicitFirstPersonTaskProposal(text: string) {
+  return /\b(?:let me|i will|i'll|i’ll|i can|i commit to|i am going to)\b/i.test(
+    text,
+  );
+}
+
+function isExplicitBlockerStatement(text: string) {
+  return /\b(?:blocked|blocker|stuck|cannot proceed|can't proceed|unable to proceed|cannot move forward|can't move forward|waiting on)\b/i.test(
+    text,
+  );
+}
+
 function isTaskOwnedBySender(
   taskId: string,
   message: TelegramInboundMessage,
@@ -931,6 +961,19 @@ function extractDeadlineText(text: string) {
     /\b(?:(?:later\s+)?in\s+\d{1,4}\s*(?:minutes?|mins?|hours?|hrs?)(?:\s+time)?|(?:by\s+|due\s+|deadline\s+(?:is\s+)?|to\s+)?(?:today|tomorrow|tmr|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|20\d{2}-\d{2}-\d{2})(?:\s+morning)?)\b/i,
   );
   return match?.[0]?.trim() ?? null;
+}
+
+function firstPersonProposalTitle(text: string) {
+  const cleaned = compact(text)
+    .replace(/^@[a-z0-9_]{3,32}\s*[,;:—-]?\s*/i, "")
+    .replace(
+      /^(?:let me|i will|i'll|i’ll|i can|i commit to|i am going to)\s+/i,
+      "",
+    )
+    .replace(/[.!?]+$/, "")
+    .trim();
+  const title = cleaned || compact(text);
+  return `${title.charAt(0).toUpperCase()}${title.slice(1)}`.slice(0, 240);
 }
 
 function stemContentToken(token: string) {

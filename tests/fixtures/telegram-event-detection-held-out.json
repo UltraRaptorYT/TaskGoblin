@@ -290,6 +290,21 @@
       "expectedEventType": "blocker"
     },
     {
+      "id": "blocker-product-observation",
+      "category": "blockers",
+      "text": "I feel the bot is not updating the status",
+      "senderUsername": "alice",
+      "expectedEventType": "none"
+    },
+    {
+      "id": "proposal-concrete-self-offer",
+      "category": "task_proposals",
+      "text": "@alice, I can create the reminder UI",
+      "senderUsername": "alice",
+      "expectedEventType": "task_proposal",
+      "expectedOwnerTelegramUserRecordId": "user-alice"
+    },
+    {
       "id": "decision-1",
       "category": "decisions",
       "text": "We decided to launch with Telegram only",

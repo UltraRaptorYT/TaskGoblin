@@ -164,6 +164,66 @@ describe("project event post-validation", () => {
     ).toBeNull();
   });
 
+  it("rejects product observations that do not explicitly block project work", () => {
+    const message = messageFor({
+      id: "status-observation",
+      category: "blockers",
+      text: "I feel the bot is not updating the status",
+      senderUsername: "alice",
+      expectedEventType: "none",
+    });
+
+    expect(
+      validateProjectEvent(
+        {
+          eventType: "blocker",
+          summary: "The bot is not updating task status.",
+          matchedTaskId: null,
+          blockerText: "bot not updating the status",
+          confidence: 0.9,
+          rationale: "Possible malfunction.",
+        },
+        message,
+        baseContext,
+      ),
+    ).toBeNull();
+  });
+
+  it("recovers a concrete first-person offer when the model is overly conservative", async () => {
+    const message = messageFor({
+      id: "self-offer",
+      category: "task_proposals",
+      text: "@alice, I can create the reminder UI",
+      senderUsername: "alice",
+      expectedEventType: "task_proposal",
+    });
+    const client = {
+      responses: {
+        parse: async () => ({
+          output_parsed: {
+            result: {
+              eventType: "none",
+              confidence: 0.86,
+              rationale: "This is an offer rather than a commitment.",
+            },
+          },
+        }),
+      },
+    };
+
+    const result = await detectProjectEvent(message, baseContext, {
+      mode: "openai",
+      client: client as never,
+      model: "test-model",
+    });
+
+    expect(result.event).toMatchObject({
+      eventType: "task_proposal",
+      summary: "Create the reminder UI",
+      ownerTelegramUserRecordId: "user-alice",
+    });
+  });
+
   it("resolves relative deadlines from the message timestamp and project timezone", () => {
     expect(
       resolveDeadline(
