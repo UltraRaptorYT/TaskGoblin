@@ -1,0 +1,228 @@
+{
+  "projectName": "taskgoblin-launchpad-demo",
+  "goal": "Create an illustrative hackathon judging advert for the current TaskGoblin prototype without recorded product footage.",
+  "audience": [
+    "Launchpad 2026 AI Challenge judges",
+    "AI engineers",
+    "product builders",
+    "technical evaluators"
+  ],
+  "durationSeconds": 90,
+  "aspectRatio": "16:9",
+  "fps": 30,
+  "quality": "draft",
+  "prompt": "Create a polished 90-second illustrated product advert for TaskGoblin, a Telegram-native AI project manager. Use stylised Telegram-like conversations, animated task cards, project-memory diagrams, confirmation buttons, document icons, reminders, and a dark TaskGoblin dashboard rather than recorded product footage. Open with useful commitments disappearing inside a noisy group chat. Show TaskGoblin noticing a concrete assignment, resolving the owner only from known group members, checking project context, and creating a reviewable candidate. Make the safety boundary visible: AI suggestions are persisted for human confirmation and never silently mutate consequential project state. Show current capabilities only: group onboarding, member linking, task proposals, assignments, progress, possible completion, deadline, blocker and decision detection; multi-task proposal batches; PDF, DOCX, TXT and MD project context; private Telegram reminders; /start, /help, /summary, /project, /kpi, /tasks and /mytasks; Telegram web login; project dashboard; list, Kanban and calendar views; and authorised task creation and editing. Do not show /recent, /addtask, /done, /update, /setproject or /addmilestone. Do not present TaskGoblin as an autonomous coding agent. Use an evidence-led hackathon tone: focused, intelligent, trustworthy and lightly playful. Finish with the line 'Turn conversation into accountable project memory' and the URL 'taskgoblin.vercel.app'.",
+  "creativeDirection": {
+    "format": "illustrated product explainer",
+    "tone": [
+      "focused",
+      "intelligent",
+      "trustworthy",
+      "lightly playful"
+    ],
+    "storyArc": [
+      "project commitments get lost in chat",
+      "TaskGoblin detects high-signal project events",
+      "humans review consequential changes",
+      "confirmed work becomes structured project memory",
+      "the team follows progress in Telegram and on the web"
+    ],
+    "visualMetaphor": "Loose chat bubbles are collected by a small goblin assistant and transformed into source-linked task cards without losing their connection to the original conversation.",
+    "avoid": [
+      "generic corporate stock footage",
+      "fake customer testimonials",
+      "unverified performance statistics",
+      "autonomous coding-agent imagery",
+      "claims that TaskGoblin reads historical Telegram messages",
+      "unsupported Telegram commands",
+      "dense paragraphs of on-screen text"
+    ]
+  },
+  "narration": {
+    "provider": "local",
+    "voiceId": "am_adam",
+    "speed": 1.08,
+    "language": "en-us",
+    "script": "Project work already happens in chat. Someone accepts a task, a deadline changes, a blocker appears—and moments later, the commitment is buried beneath the conversation. TaskGoblin turns permitted Telegram group messages into persistent, reviewable project memory. It detects high-signal events such as task proposals, assignments, progress, possible completions, deadlines, blockers and decisions. But the model does not get to rewrite the project by itself. TaskGoblin checks known members, existing tasks, recent context and likely duplicates, then preserves the source message and asks the team to review consequential changes. Share a PDF, Word document, text file or Markdown brief, and TaskGoblin can use the extracted content as bounded project context. It can propose several tasks from one request, send private deadline reminders, and answer follow-up questions using the relevant task and project. Deterministic commands provide summaries, project context, KPIs, active tasks and each member's work across projects. Confirmed information also appears in a Telegram-authenticated dashboard with project health, editable tasks, a Kanban board and a calendar. TaskGoblin is a working prototype, not an autonomous coding agent. It keeps humans in control while reducing the work of turning conversation into execution. TaskGoblin. Turn conversation into accountable project memory."
+  },
+  "music": {
+    "provider": "none",
+    "mood": "focused, intelligent, lightly playful",
+    "volume": 0
+  },
+  "visual": {
+    "canvas": "#071A10",
+    "ink": "#F7F5EC",
+    "accent": "#DFFF64",
+    "paper": "#122A1C",
+    "muted": "#9FB1A3",
+    "warning": "#F4D77B",
+    "fontStyle": "bold editorial sans serif with compact monospace labels",
+    "motionStyle": "clean 2D motion graphics, springy task-card movement, restrained parallax, crisp UI transitions",
+    "safeAreaPercent": 8
+  },
+  "featureWhitelist": {
+    "telegramCommands": [
+      "/start",
+      "/help",
+      "/summary",
+      "/project",
+      "/kpi",
+      "/tasks",
+      "/mytasks"
+    ],
+    "eventDetection": [
+      "task proposal",
+      "explicit task assignment",
+      "task progress update",
+      "possible task completion",
+      "deadline update",
+      "blocker",
+      "decision"
+    ],
+    "telegram": [
+      "group onboarding and project provisioning",
+      "member identity linking",
+      "source-linked reviewable candidates",
+      "inline confirmation controls",
+      "multi-task proposal batches",
+      "rapid-message context coalescing",
+      "private scheduled reminders",
+      "project-grounded reminder follow-up advice",
+      "PDF, DOCX, TXT and MD context ingestion up to 15 MB"
+    ],
+    "website": [
+      "Telegram web authentication",
+      "membership-filtered projects",
+      "project progress and calculated health",
+      "list view",
+      "Kanban board",
+      "calendar view",
+      "authorised task creation and editing"
+    ]
+  },
+  "prohibitedClaims": [
+    "/recent is available",
+    "/addtask is available",
+    "/done is available",
+    "/update is available",
+    "/setproject is available",
+    "/addmilestone is available",
+    "TaskGoblin autonomously writes or executes code",
+    "TaskGoblin silently applies consequential AI changes",
+    "TaskGoblin can access messages sent before the bot received them",
+    "TaskGoblin performs OCR on scanned PDFs",
+    "TaskGoblin supports WhatsApp"
+  ],
+  "scenes": [
+    {
+      "id": "lost-in-chat",
+      "startSeconds": 0,
+      "endSeconds": 10,
+      "purpose": "Establish the coordination problem.",
+      "visuals": "A busy illustrated Telegram-like group chat fills the frame. Important messages such as 'I will build the API' and 'Due Friday' are pushed upward by jokes and acknowledgements.",
+      "onScreenText": [
+        "PROJECT WORK ALREADY HAPPENS IN CHAT",
+        "But commitments disappear."
+      ],
+      "transition": "A neon green thread catches the disappearing commitment."
+    },
+    {
+      "id": "event-detection",
+      "startSeconds": 10,
+      "endSeconds": 23,
+      "purpose": "Show per-message AI event detection.",
+      "visuals": "The green thread guides one source message into a structured event card. Small context tiles appear for known members, existing tasks, recent messages and duplicates.",
+      "onScreenText": [
+        "PER-MESSAGE EVENT DETECTION",
+        "Assignment • Progress • Deadline • Blocker • Decision"
+      ],
+      "transition": "The event card pauses before a confirmation gate."
+    },
+    {
+      "id": "human-control",
+      "startSeconds": 23,
+      "endSeconds": 35,
+      "purpose": "Explain the trust and safety boundary.",
+      "visuals": "A source-linked candidate card displays concise rationale and confidence. Confirm and Ignore controls appear. The database icon remains locked until a human confirms.",
+      "onScreenText": [
+        "AI PROPOSES. PEOPLE CONFIRM.",
+        "No silent project mutations."
+      ],
+      "transition": "A confirmed card clicks into the project-memory timeline."
+    },
+    {
+      "id": "documents-and-batches",
+      "startSeconds": 35,
+      "endSeconds": 47,
+      "purpose": "Show document context and multi-task planning.",
+      "visuals": "PDF, DOCX, TXT and MD pages feed a bounded context panel. One planning request unfolds into several reviewable task cards instead of one oversized task.",
+      "onScreenText": [
+        "PROJECT CONTEXT, NOT JUST ONE MESSAGE",
+        "Documents + recent chat + confirmed tasks"
+      ],
+      "transition": "Task cards fan into Telegram and the dashboard."
+    },
+    {
+      "id": "telegram-workflow",
+      "startSeconds": 47,
+      "endSeconds": 60,
+      "purpose": "Show the implemented Telegram-native workflow.",
+      "visuals": "Animate group onboarding, member linking, a concise /summary response, an interactive /tasks selection, and a private deadline reminder.",
+      "onScreenText": [
+        "/summary  /project  /kpi  /tasks  /mytasks",
+        "Work stays where the team talks."
+      ],
+      "transition": "A dashboard link expands into the website."
+    },
+    {
+      "id": "dashboard",
+      "startSeconds": 60,
+      "endSeconds": 74,
+      "purpose": "Show the web correction and overview surface.",
+      "visuals": "A dark TaskGoblin dashboard appears after Telegram login. Move a task across a Kanban board, edit its owner and deadline, then switch to a calendar view.",
+      "onScreenText": [
+        "TELEGRAM-AUTHENTICATED WORKSPACE",
+        "Kanban • Calendar • Editable tasks • Project health"
+      ],
+      "transition": "The dashboard zooms out into a simple system diagram."
+    },
+    {
+      "id": "architecture-and-evidence",
+      "startSeconds": 74,
+      "endSeconds": 84,
+      "purpose": "Communicate engineering credibility without invented metrics.",
+      "visuals": "A clean pipeline shows Telegram webhook, deterministic routing, OpenAI Structured Outputs, persisted candidates, Supabase state and human confirmation. A test grid illuminates behind it.",
+      "onScreenText": [
+        "CONSTRAINED AGENTIC WORKFLOW",
+        "Structured outputs • Source traceability • 100+ automated tests"
+      ],
+      "transition": "All elements collapse into the TaskGoblin mark."
+    },
+    {
+      "id": "end-card",
+      "startSeconds": 84,
+      "endSeconds": 90,
+      "purpose": "Deliver the product promise and call to action.",
+      "visuals": "TaskGoblin logo on the dark green canvas with a soft acid-lime glow. A final chat bubble becomes a checked task card.",
+      "onScreenText": [
+        "TURN CONVERSATION INTO ACCOUNTABLE PROJECT MEMORY",
+        "taskgoblin.vercel.app"
+      ],
+      "transition": "Hold the final card for two seconds."
+    }
+  ],
+  "renderingInstructions": {
+    "useRecordedProductFootage": false,
+    "useIllustrativeUi": true,
+    "showDisclaimer": "Illustrative prototype visualisation",
+    "maxWordsPerTextCard": 12,
+    "captionStyle": "high-contrast sentence case captions near the lower safe area",
+    "logoTreatment": "preserve the existing green goblin identity; do not redesign the logo",
+    "finalHoldSeconds": 2
+  },
+  "outputs": {
+    "draft": "renders/taskgoblin-launchpad-example-90s.mp4",
+    "final": "renders/taskgoblin-launchpad-final.mp4"
+  }
+}

@@ -55,6 +55,12 @@ candidates and shown through Telegram confirmation controls before they change
 project state. The website provides a secondary Kanban, calendar and correction
 surface; Telegram remains the primary workflow.
 
+The current bot command surface is deliberately small: `/start`, `/help`,
+`/summary`, `/project`, `/kpi`, `/tasks` and `/mytasks`. Task selection and
+candidate review continue through inline Telegram buttons. Commands such as
+`/recent`, `/addtask`, `/done`, `/update`, `/setproject` and `/addmilestone`
+are roadmap ideas, not features of the submitted prototype.
+
 We rejected three simpler alternatives. Manual task entry preserves accuracy
 but restores the administrative friction we are trying to remove. Full-chat
 rescanning repeatedly processes old information, costs more and risks duplicate
@@ -85,11 +91,11 @@ In a timed reconstruction study with `[MEASURE: N]` participants and
 recorded candidate acceptance, correction, duplicate and reminder-response
 rates.
 
-The repository currently has 101 passing automated tests covering webhook
-validation, update normalisation, commands, callbacks, event detection,
-documents, permissions and web task operations. This establishes engineering
-correctness, not user value; the user study and held-out comparison support the
-product claims.
+The repository has over 100 automated tests covering webhook validation,
+update normalisation, commands, callbacks, event detection, documents,
+permissions and web task operations. This establishes engineering correctness,
+not user value; the user study and held-out comparison support the product
+claims.
 
 ### Constraints
 
@@ -183,3 +189,48 @@ these measurements identify a real failure.
 6. Analyse confirmation, correction, duplicate and reminder-response rates.
 7. Add retention, deletion and project-export controls.
 8. Revise claims and scope according to the measured results.
+
+## Appendix E — Current Demonstrable Feature Surface
+
+### Telegram
+
+- Greets and provisions a project group when the bot is added.
+- Links members when they say `hello`; private chat `/start` enables direct
+  reminders.
+- Supports `/start`, `/help`, `/summary`, `/project`, `/kpi`, `/tasks` and
+  `/mytasks`.
+- Detects task proposals, explicit assignments, progress, possible
+  completions, deadline changes, blockers and decisions from permitted group
+  messages.
+- Persists source-linked candidates and asks users to Confirm, Edit or Ignore
+  consequential changes with inline buttons.
+- Can propose and confirm several tasks as one reviewed batch.
+- Reads PDF, DOCX, TXT and MD files up to 15 MB as bounded project context;
+  scanned PDFs need OCR first.
+- Coalesces short bursts of messages before AI processing and retains recent
+  project context.
+- Sends scheduled private Telegram reminders and grounds reminder follow-up
+  advice in the relevant task, project and stored documents.
+- Links command and agent responses back to the relevant project dashboard.
+
+### Website
+
+- Uses Telegram web authentication and filters projects by known group
+  membership.
+- Shows project progress, task counts, members, review state and calculated
+  health.
+- Provides list, Kanban board and calendar views.
+- Allows authorised users to create tasks and edit task details, owner,
+  deadline, priority and status.
+- Retains the legacy project-brief import flow.
+
+### Not in the Current Prototype
+
+- `/recent`, `/addtask`, `/done`, `/update`, `/setproject` and
+  `/addmilestone` commands.
+- Autonomous code execution or a hosted coding-agent runtime.
+- Retroactive access to Telegram messages sent before the bot could receive
+  them.
+- OCR for image-only or scanned PDFs.
+- Automatic, unreviewed mutation of consequential project state from model
+  output.
