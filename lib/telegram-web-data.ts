@@ -196,6 +196,15 @@ export type TelegramProjectTask = {
 export type TelegramProjectDetail = TelegramProjectSummary & {
   tasks: TelegramProjectTask[];
   members: Array<{ id: string; displayName: string; role: string }>;
+  reportSettings: TelegramProjectReportSettings;
+};
+
+export type TelegramProjectReportSettings = {
+  reportEnabled: boolean;
+  reportFrequency: "daily" | "weekly";
+  reportLocalTime: string;
+  reportWeekday: number;
+  timezone: string;
 };
 
 export async function getTelegramProjectDetail(
@@ -227,7 +236,7 @@ export async function getTelegramProjectDetail(
       admin
         .from("taskgoblin_projects")
         .select(
-          "id, name, description, health_score, health_label, timezone, updated_at",
+          "id, name, description, health_score, health_label, timezone, report_enabled, report_frequency, report_local_time, report_weekday, updated_at",
         )
         .eq("id", projectId)
         .single(),
@@ -318,5 +327,14 @@ export async function getTelegramProjectDetail(
     updatedAt: projectResult.data.updated_at,
     tasks,
     members,
+    reportSettings: {
+      reportEnabled: projectResult.data.report_enabled,
+      reportFrequency: projectResult.data.report_frequency as
+        | "daily"
+        | "weekly",
+      reportLocalTime: String(projectResult.data.report_local_time).slice(0, 5),
+      reportWeekday: projectResult.data.report_weekday,
+      timezone: projectResult.data.timezone,
+    },
   };
 }

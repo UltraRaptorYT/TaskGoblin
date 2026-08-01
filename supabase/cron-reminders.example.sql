@@ -16,12 +16,13 @@ select cron.schedule(
   $$
 );
 
--- 20:00 Asia/Singapore is 12:00 UTC throughout the year.
--- This job sends one deduplicated project report per active Telegram group,
--- including progress, urgent work, ownership, blockers and a seven-day outlook.
+-- Run the dispatcher every five minutes. The application checks each project's
+-- enabled state, frequency, weekday, local time and IANA timezone before sending.
+-- Delivery claims prevent duplicates and retry a failed send up to three times.
+-- Keep the existing job name so rerunning this statement updates it in place.
 select cron.schedule(
   'taskgoblin-daily-project-report',
-  '0 12 * * *',
+  '*/5 * * * *',
   $$
     select net.http_get(
       url := (select decrypted_secret from vault.decrypted_secrets where name = 'taskgoblin_app_url') || '/api/cron/project-reports',

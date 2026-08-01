@@ -12,6 +12,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ProjectTaskWorkspace } from "@/app/dashboard/projects/[projectId]/project-task-workspace";
+import { ProjectReportSettings } from "@/app/dashboard/projects/[projectId]/project-report-settings";
 import { getTelegramWebIdentity } from "@/lib/telegram-web-auth";
 import { getTelegramProjectDetail } from "@/lib/telegram-web-data";
 
@@ -134,6 +135,11 @@ export default async function ProjectPage({
         />
 
         <aside className="space-y-5">
+          <ProjectReportSettings
+            projectId={project.id}
+            initialSettings={project.reportSettings}
+            canEdit={project.memberRole === "admin"}
+          />
           <div className="rounded-[1.5rem] border border-white/10 bg-[#102219] p-5">
             <h2 className="text-sm font-black">Project members</h2>
             <div className="mt-4 space-y-3">

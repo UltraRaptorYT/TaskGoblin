@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   dailyProjectReport,
+  isProjectReportDue,
+  projectReportDate,
+  scheduledProjectReport,
   singaporeReportDate,
 } from "@/lib/telegram-project-report";
 import type { TelegramTaskRow } from "@/lib/telegram-repository";
@@ -55,6 +58,73 @@ describe("daily Telegram project reports", () => {
     expect(singaporeReportDate(new Date("2026-07-31T16:30:00.000Z"))).toBe(
       "2026-08-01",
     );
+  });
+
+  it("dispatches a daily report only after the project's local time", () => {
+    const schedule = {
+      timezone: "Asia/Singapore",
+      report_enabled: true,
+      report_frequency: "daily" as const,
+      report_local_time: "20:00:00",
+      report_weekday: 1,
+    };
+
+    expect(
+      isProjectReportDue(schedule, new Date("2026-08-01T11:59:00.000Z")),
+    ).toBe(false);
+    expect(
+      isProjectReportDue(schedule, new Date("2026-08-01T12:00:00.000Z")),
+    ).toBe(true);
+  });
+
+  it("honours disabled and weekly schedules in the project's timezone", () => {
+    const weekly = {
+      timezone: "America/New_York",
+      report_enabled: true,
+      report_frequency: "weekly" as const,
+      report_local_time: "20:00",
+      report_weekday: 5,
+    };
+
+    // Friday 20:00 in New York.
+    expect(
+      isProjectReportDue(weekly, new Date("2026-08-01T00:00:00.000Z")),
+    ).toBe(true);
+    expect(
+      isProjectReportDue(
+        { ...weekly, report_enabled: false },
+        new Date("2026-08-01T00:00:00.000Z"),
+      ),
+    ).toBe(false);
+    expect(
+      isProjectReportDue(weekly, new Date("2026-08-02T00:00:00.000Z")),
+    ).toBe(false);
+  });
+
+  it("uses each project's local calendar date as its delivery key", () => {
+    const now = new Date("2026-08-01T01:00:00.000Z");
+    expect(projectReportDate(now, "Asia/Singapore")).toBe("2026-08-01");
+    expect(projectReportDate(now, "America/Los_Angeles")).toBe("2026-07-31");
+  });
+
+  it("labels a configured weekly report with its local schedule", () => {
+    const report = scheduledProjectReport(
+      {
+        id: "project-1",
+        name: "Launchpad",
+        timezone: "Asia/Singapore",
+        report_enabled: true,
+        report_frequency: "weekly",
+        report_local_time: "20:00:00",
+        report_weekday: 1,
+      },
+      [],
+      new Date("2026-08-01T12:00:00.000Z"),
+    );
+
+    expect(report).toContain("Weekly project report");
+    expect(report).toContain("8:00 PM");
+    expect(report).toContain("Asia/Singapore");
   });
 });
 

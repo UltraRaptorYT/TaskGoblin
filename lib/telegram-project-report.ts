@@ -6,19 +6,77 @@ import type {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function singaporeReportDate(now = new Date()) {
+export type ProjectReportSchedule = {
+  timezone: string;
+  report_enabled: boolean;
+  report_frequency: "daily" | "weekly";
+  report_local_time: string;
+  report_weekday: number;
+};
+
+export function projectReportDate(now: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Singapore",
+    timeZone: safeTimezone(timezone),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(now);
 }
 
+export function singaporeReportDate(now = new Date()) {
+  return projectReportDate(now, "Asia/Singapore");
+}
+
+export function isProjectReportDue(
+  schedule: ProjectReportSchedule,
+  now = new Date(),
+) {
+  if (!schedule.report_enabled) return false;
+  const scheduled = parseLocalTime(schedule.report_local_time);
+  if (!scheduled) return false;
+  const parts = localScheduleParts(now, schedule.timezone);
+  if (
+    schedule.report_frequency === "weekly" &&
+    parts.weekday !== schedule.report_weekday
+  ) {
+    return false;
+  }
+  return parts.hour * 60 + parts.minute >= scheduled.hour * 60 + scheduled.minute;
+}
+
 export function dailyProjectReport(
   project: Pick<TelegramProjectRow, "id" | "name">,
   tasks: TelegramTaskRow[],
   now = new Date(),
+) {
+  return projectReportMessage(project, tasks, now, {
+    timezone: "Asia/Singapore",
+    frequency: "daily",
+    localTime: "20:00",
+  });
+}
+
+export function scheduledProjectReport(
+  project: Pick<TelegramProjectRow, "id" | "name"> & ProjectReportSchedule,
+  tasks: TelegramTaskRow[],
+  now = new Date(),
+) {
+  return projectReportMessage(project, tasks, now, {
+    timezone: project.timezone,
+    frequency: project.report_frequency,
+    localTime: project.report_local_time,
+  });
+}
+
+function projectReportMessage(
+  project: Pick<TelegramProjectRow, "id" | "name">,
+  tasks: TelegramTaskRow[],
+  now: Date,
+  schedule: {
+    timezone: string;
+    frequency: "daily" | "weekly";
+    localTime: string;
+  },
 ) {
   const done = tasks.filter((task) => task.status === "done");
   const active = tasks.filter((task) => task.status !== "done");
@@ -48,13 +106,16 @@ export function dailyProjectReport(
   }
 
   const lines = [
-    `🌙 8pm project report · ${project.name}`,
+    `🌙 ${schedule.frequency === "weekly" ? "Weekly" : "Daily"} project report · ${project.name}`,
+    `Scheduled for ${displayLocalTime(schedule.localTime)} · ${safeTimezone(schedule.timezone)}`,
     `Progress: ${progress}% (${done.length}/${tasks.length} tasks complete)`,
     `Active: ${active.length} · Blocked: ${blocked.length} · Overdue: ${overdue.length}`,
     "",
     "🚨 Urgent now",
     ...(urgent.length
-      ? urgent.slice(0, 6).map((task) => taskLine(task, now))
+      ? urgent
+          .slice(0, 6)
+          .map((task) => taskLine(task, now, schedule.timezone))
       : ["Nothing urgent right now."]),
     "",
     "👥 Who needs to do what",
@@ -69,7 +130,10 @@ export function dailyProjectReport(
         ...ownerTasks
           .sort((left, right) => urgencyScore(right, now) - urgencyScore(left, now))
           .slice(0, 4)
-          .map((task) => `• ${task.title}${dueSuffix(task)}`),
+          .map(
+            (task) =>
+              `• ${task.title}${dueSuffix(task, schedule.timezone)}`,
+          ),
       );
       if (ownerTasks.length > 4) {
         lines.push(`• …and ${ownerTasks.length - 4} more`);
@@ -81,7 +145,9 @@ export function dailyProjectReport(
     "",
     "📅 Next 7 days",
     ...(dueThisWeek.length
-      ? dueThisWeek.slice(0, 6).map((task) => taskLine(task, now))
+      ? dueThisWeek
+          .slice(0, 6)
+          .map((task) => taskLine(task, now, schedule.timezone))
       : ["No dated tasks due in the next seven days."]),
     "",
     "⛔ Blockers",
@@ -98,16 +164,62 @@ export function dailyProjectReport(
   return lines.join("\n").slice(0, 4096);
 }
 
-function taskLine(task: TelegramTaskRow, now: Date) {
+function localScheduleParts(now: Date, timezone: string) {
+  const values = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: safeTimezone(timezone),
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(now)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
+    values.weekday,
+  );
+  return {
+    weekday,
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+  };
+}
+
+function parseLocalTime(value: string) {
+  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  if (!match) return null;
+  return { hour: Number(match[1]), minute: Number(match[2]) };
+}
+
+function displayLocalTime(value: string) {
+  const parsed = parseLocalTime(value);
+  if (!parsed) return value;
+  const suffix = parsed.hour >= 12 ? "PM" : "AM";
+  const hour = parsed.hour % 12 || 12;
+  return `${hour}:${String(parsed.minute).padStart(2, "0")} ${suffix}`;
+}
+
+function safeTimezone(value: string) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return value;
+  } catch {
+    return "UTC";
+  }
+}
+
+function taskLine(task: TelegramTaskRow, now: Date, timezone: string) {
   const marker = isOverdue(task, now)
     ? "OVERDUE"
     : task.priority.toUpperCase();
-  return `• [${marker}] ${task.title} — ${task.source_participant_name?.trim() || "Unassigned"}${dueSuffix(task)}`;
+  return `• [${marker}] ${task.title} — ${task.source_participant_name?.trim() || "Unassigned"}${dueSuffix(task, timezone)}`;
 }
 
-function dueSuffix(task: TelegramTaskRow) {
+function dueSuffix(task: TelegramTaskRow, timezone: string) {
   return task.due_label || task.due_at
-    ? ` · due ${task.due_label ?? formatSingapore(task.due_at!)}`
+    ? ` · due ${task.due_label ?? formatInTimezone(task.due_at!, timezone)}`
     : "";
 }
 
@@ -142,11 +254,11 @@ function timestamp(value: string | null) {
   return Number.isNaN(time) ? null : time;
 }
 
-function formatSingapore(value: string) {
+function formatInTimezone(value: string, timezone: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
+    timeZone: safeTimezone(timezone),
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);

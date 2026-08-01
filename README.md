@@ -133,10 +133,16 @@ undone as one action. A confidently matched explicit completion is applied
 without an extra confirmation message: TaskGoblin reacts with 🎉, marks the
 task done, and attributes it to the member who completed it.
 
-The project-report cron route sends one deduplicated report per active group at
-20:00 Asia/Singapore. It includes progress, urgent and overdue work, ownership,
-blockers, and a seven-day outlook. The existing due-reminder cron remains
-frequent so deadline reminders are not delayed until the evening report.
+The project-report cron route is a five-minute dispatcher. Project administrators
+can configure each project's automatic report as daily or weekly, select the
+local send time and timezone, choose a weekly weekday, or pause it from the web
+dashboard. Reports include progress, urgent and overdue work, ownership,
+blockers, and a seven-day outlook. Delivery claims prevent duplicates and retry
+a failed Telegram send up to three times. Apply
+`supabase/migrations/20260801143540_configurable_project_reports.sql`, then run
+`supabase/cron-reminders.example.sql` (or update the existing Supabase Cron job)
+after deployment. The existing due-reminder cron remains frequent so deadline
+reminders are not delayed until a scheduled report.
 
 Inline title and owner editing uses a 10-minute edit session. Apply
 `supabase/migrations/20260801064358_telegram_inline_edit_sessions.sql` before

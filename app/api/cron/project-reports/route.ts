@@ -4,8 +4,10 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram-bot";
 import { projectHomeMenu } from "@/lib/telegram-command-responses";
 import {
-  dailyProjectReport,
-  singaporeReportDate,
+  isProjectReportDue,
+  projectReportDate,
+  scheduledProjectReport,
+  type ProjectReportSchedule,
 } from "@/lib/telegram-project-report";
 import type {
   TelegramProjectRow,
@@ -17,6 +19,8 @@ type ReportChatRow = {
   telegram_chat_id: number | string;
   project_id: string;
 };
+
+type ReportProjectRow = TelegramProjectRow & ProjectReportSchedule;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -52,7 +56,9 @@ export async function GET(request: Request) {
   const [projectResult, taskResult] = await Promise.all([
     supabase
       .from("taskgoblin_projects")
-      .select("id, name, description, health_score, health_label, timezone")
+      .select(
+        "id, name, description, health_score, health_label, timezone, report_enabled, report_frequency, report_local_time, report_weekday",
+      )
       .in("id", projectIds),
     supabase
       .from("taskgoblin_tasks")
@@ -77,7 +83,7 @@ export async function GET(request: Request) {
   }
 
   const projects = new Map(
-    ((projectResult.data ?? []) as TelegramProjectRow[]).map((project) => [
+    ((projectResult.data ?? []) as ReportProjectRow[]).map((project) => [
       project.id,
       project,
     ]),
@@ -90,9 +96,9 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
-  const reportDate = singaporeReportDate(now);
   let sent = 0;
   let skipped = 0;
+  let due = 0;
 
   for (const chat of chats) {
     const project = projects.get(chat.project_id);
@@ -100,28 +106,36 @@ export async function GET(request: Request) {
       skipped += 1;
       continue;
     }
+    if (!isProjectReportDue(project, now)) {
+      skipped += 1;
+      continue;
+    }
+    due += 1;
+    const reportDate = projectReportDate(now, project.timezone);
 
-    const { data: deliveryRow, error: claimError } = await supabase
-      .from("taskgoblin_project_report_deliveries")
-      .insert({
-        project_id: project.id,
-        telegram_chat_record_id: chat.id,
-        report_date: reportDate,
-        status: "processing",
-      })
-      .select("id")
-      .single();
+    const { data: deliveryId, error: claimError } = await supabase.rpc(
+      "taskgoblin_claim_project_report_delivery",
+      {
+        p_project_id: project.id,
+        p_telegram_chat_record_id: chat.id,
+        p_report_date: reportDate,
+      },
+    );
     if (claimError) {
-      if (claimError.code === "23505") {
-        skipped += 1;
-        continue;
-      }
       return NextResponse.json({ error: claimError.message }, { status: 500 });
+    }
+    if (!deliveryId) {
+      skipped += 1;
+      continue;
     }
 
     const delivery = await sendTelegramMessage(
       chat.telegram_chat_id,
-      dailyProjectReport(project, tasksByProject.get(project.id) ?? [], now),
+      scheduledProjectReport(
+        project,
+        tasksByProject.get(project.id) ?? [],
+        now,
+      ),
       { replyMarkup: projectHomeMenu(project) },
     );
     await supabase
@@ -134,9 +148,9 @@ export async function GET(request: Request) {
         error_message: delivery.error ?? null,
         sent_at: delivery.sent ? new Date().toISOString() : null,
       })
-      .eq("id", deliveryRow.id);
+      .eq("id", deliveryId);
     if (delivery.sent) sent += 1;
   }
 
-  return NextResponse.json({ processed: chats.length, sent, skipped });
+  return NextResponse.json({ processed: chats.length, due, sent, skipped });
 }
