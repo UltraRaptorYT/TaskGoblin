@@ -471,7 +471,35 @@ describe("processTelegramUpdate onboarding", () => {
       "candidate-1",
       "confirm",
     );
-    expect(gateway.reactToMessage).toHaveBeenCalledWith(-10, 2, "✅");
+    expect(gateway.reactToMessage).toHaveBeenCalledWith(-10, 2, "🎉");
+    expect(gateway.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("stays silent when Telegram cannot apply the completion reaction", async () => {
+    const gateway = gatewayMock();
+    vi.mocked(gateway.reactToMessage!).mockResolvedValueOnce({
+      sent: false,
+      error: "REACTION_INVALID",
+    });
+    eventPipeline.detectAndPersistProjectEvent.mockResolvedValue({
+      id: "candidate-1",
+      eventType: "possible_task_completion",
+      summary: "Finished the project UI",
+      confidence: 0.94,
+      matchedTaskId: "task-1",
+      duplicateOfTaskId: null,
+      duplicateOfCandidateId: null,
+      dueLabel: null,
+    });
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      { ...baseMessage, text: "I finished the project UI" },
+      gateway,
+    );
+
+    expect(repository.reviewProjectEventCandidate).toHaveBeenCalled();
+    expect(gateway.reactToMessage).toHaveBeenCalledWith(-10, 2, "🎉");
     expect(gateway.sendMessage).not.toHaveBeenCalled();
   });
 

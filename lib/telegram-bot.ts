@@ -94,12 +94,13 @@ export async function clearTelegramInlineKeyboard(
 export async function setTelegramMessageReaction(
   chatId: string | number,
   messageId: number,
-  emoji = "✅",
+  emoji = "🎉",
 ) {
   return callTelegram("setMessageReaction", {
     chat_id: chatId,
     message_id: messageId,
     reaction: [{ type: "emoji", emoji }],
+    is_big: true,
   });
 }
 

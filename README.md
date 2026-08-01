@@ -130,7 +130,7 @@ across every TaskGoblin project.
 `/undo` reverses the latest task mutation in the current project group. Task
 changes are recorded in transaction-sized groups, so one bulk assignment is
 undone as one action. A confidently matched explicit completion is applied
-without an extra confirmation message: TaskGoblin reacts with ✅, marks the
+without an extra confirmation message: TaskGoblin reacts with 🎉, marks the
 task done, and attributes it to the member who completed it.
 
 The project-report cron route sends one deduplicated report per active group at

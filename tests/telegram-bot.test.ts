@@ -16,7 +16,7 @@ describe("Telegram bot reactions", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await setTelegramMessageReaction(-100, 77, "✅");
+    const result = await setTelegramMessageReaction(-100, 77, "🎉");
 
     expect(result.sent).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -25,9 +25,10 @@ describe("Telegram bot reactions", () => {
         method: "POST",
         body: JSON.stringify({
           chat_id: -100,
-          message_id: 77,
-          reaction: [{ type: "emoji", emoji: "✅" }],
-        }),
+        message_id: 77,
+        reaction: [{ type: "emoji", emoji: "🎉" }],
+        is_big: true,
+      }),
       }),
     );
   });

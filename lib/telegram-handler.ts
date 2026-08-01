@@ -431,19 +431,12 @@ export async function processTelegramUpdate(
               ? await gateway.reactToMessage(
                   update.chat.id,
                   update.messageId,
-                  "✅",
+                  "🎉",
                 )
               : { sent: false };
-            if (reaction.sent) {
-              replySent = true;
-            } else {
-              const fallback = await gateway.sendMessage(
-                update.chat.id,
-                "✅ Task marked complete and attributed to the member who completed it.",
-                { replyToMessageId: update.messageId },
-              );
-              replySent = fallback.sent || replySent;
-            }
+            // A failed reaction must not create a noisy acknowledgement message.
+            // The confirmed task mutation remains persisted and visible in task views.
+            replySent = reaction.sent || replySent;
           } else {
             const delivery = await gateway.sendMessage(
               update.chat.id,
