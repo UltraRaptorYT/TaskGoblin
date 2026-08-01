@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { processTelegramUpdate, type TelegramGateway } from "@/lib/telegram-handler";
 import type {
   TelegramInboundBotAdded,
+  TelegramInboundCallback,
   TelegramInboundMessage,
 } from "@/lib/taskgoblin-types";
+import { taskActionCallbackData } from "@/lib/telegram-callbacks";
 
 const repository = vi.hoisted(() => ({
+  applyTelegramOwnerChoice: vi.fn(),
   claimTelegramUpdate: vi.fn(),
   completeTelegramUpdate: vi.fn(),
+  consumeTelegramTitleEdit: vi.fn(),
   ensureTelegramContext: vi.fn(),
   failTelegramUpdate: vi.fn(),
   getTaskForTelegramContext: vi.fn(),
@@ -27,7 +31,13 @@ const repository = vi.hoisted(() => ({
   reviewTaskCandidate: vi.fn(),
   resolvePrivateReminderReplyContext: vi.fn(),
   resolveRecentPrivateReminderContext: vi.fn(),
+  snoozeTaskReminder: vi.fn(),
+  startTelegramEditSession: vi.fn(),
+  updateCandidateDeadlineFromTelegram: vi.fn(),
   updatePersistedTelegramMessageText: vi.fn(),
+  updateTaskDeadlineFromTelegram: vi.fn(),
+  updateTaskStatusFromTelegram: vi.fn(),
+  undoLastTaskMutation: vi.fn(),
 }));
 const eventPipeline = vi.hoisted(() => ({
   detectAndPersistProjectEvent: vi.fn(),
@@ -91,6 +101,7 @@ describe("processTelegramUpdate onboarding", () => {
       displayName: "Alex Tan",
     });
     repository.persistTelegramMessage.mockResolvedValue({ id: "message-1" });
+    repository.consumeTelegramTitleEdit.mockResolvedValue(null);
     repository.persistTelegramProjectDocument.mockResolvedValue(undefined);
     repository.linkPersistedTelegramMessageToProject.mockResolvedValue(
       undefined,
@@ -99,6 +110,15 @@ describe("processTelegramUpdate onboarding", () => {
     repository.resolveRecentPrivateReminderContext.mockResolvedValue(null);
     repository.updatePersistedTelegramMessageText.mockResolvedValue(undefined);
     repository.completeTelegramUpdate.mockResolvedValue(undefined);
+    repository.reviewProjectEventCandidate.mockResolvedValue({
+      candidateId: "candidate-1",
+      state: "confirmed",
+      taskId: "task-1",
+      eventType: "possible_task_completion",
+      summary: "Finished the project UI",
+      reminderScheduledFor: null,
+    });
+    repository.undoLastTaskMutation.mockResolvedValue(null);
     eventPipeline.detectAndPersistProjectEvent.mockResolvedValue(null);
     messageBatching.coalesceRapidTelegramMessages.mockImplementation(
       async (
@@ -164,7 +184,10 @@ describe("processTelegramUpdate onboarding", () => {
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       -10,
       expect.stringContaining("Each team member should send hello"),
-      { replyToMessageId: 2 },
+      expect.objectContaining({
+        replyToMessageId: 2,
+        replyMarkup: expect.objectContaining({ inline_keyboard: expect.any(Array) }),
+      }),
     );
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
     expect(repository.completeTelegramUpdate).toHaveBeenCalledWith(
@@ -203,12 +226,14 @@ describe("processTelegramUpdate onboarding", () => {
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       -10,
       expect.stringContaining("Quick setup"),
+      expect.objectContaining({ replyMarkup: expect.any(Object) }),
     );
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       -10,
       expect.stringContaining(
         "https://taskgoblin.vercel.app/dashboard/projects/project-1",
       ),
+      expect.objectContaining({ replyMarkup: expect.any(Object) }),
     );
     expect(repository.persistTelegramMessage).not.toHaveBeenCalled();
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
@@ -226,7 +251,10 @@ describe("processTelegramUpdate onboarding", () => {
     expect(gateway.sendMessage).toHaveBeenCalledWith(
       -10,
       expect.stringContaining("You are linked to this project as @alex"),
-      { replyToMessageId: 2 },
+      expect.objectContaining({
+        replyToMessageId: 2,
+        replyMarkup: expect.objectContaining({ inline_keyboard: expect.any(Array) }),
+      }),
     );
     expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
   });
@@ -390,6 +418,63 @@ describe("processTelegramUpdate onboarding", () => {
     );
   });
 
+  it("undoes the latest task mutation in a project group", async () => {
+    const gateway = gatewayMock();
+    repository.undoLastTaskMutation.mockResolvedValue({
+      transactionId: 42,
+      affectedTaskCount: 1,
+      description: "Restored the previous owner for Build the API.",
+    });
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      { ...baseMessage, text: "/undo" },
+      gateway,
+    );
+
+    expect(repository.undoLastTaskMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        projectId: "project-1",
+        userRecordId: "user-1",
+      }),
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      "↩️ Restored the previous owner for Build the API.",
+      expect.objectContaining({ replyToMessageId: 2 }),
+    );
+  });
+
+  it("reacts to a high-confidence completion and records the completing member", async () => {
+    const gateway = gatewayMock();
+    eventPipeline.detectAndPersistProjectEvent.mockResolvedValue({
+      id: "candidate-1",
+      eventType: "possible_task_completion",
+      summary: "Finished the project UI",
+      confidence: 0.94,
+      matchedTaskId: "task-1",
+      duplicateOfTaskId: null,
+      duplicateOfCandidateId: null,
+      dueLabel: null,
+    });
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      { ...baseMessage, text: "I finished the project UI" },
+      gateway,
+    );
+
+    expect(repository.reviewProjectEventCandidate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userRecordId: "user-1" }),
+      "candidate-1",
+      "confirm",
+    );
+    expect(gateway.reactToMessage).toHaveBeenCalledWith(-10, 2, "✅");
+    expect(gateway.sendMessage).not.toHaveBeenCalled();
+  });
+
   it("links a private reminder reply back to its project and asks the agent for advice", async () => {
     const gateway = gatewayMock();
     repository.ensureTelegramContext.mockResolvedValue({
@@ -501,6 +586,83 @@ describe("processTelegramUpdate onboarding", () => {
       }),
     );
   });
+
+  it("consumes an active title edit without invoking batching or AI", async () => {
+    const gateway = gatewayMock();
+    repository.consumeTelegramTitleEdit.mockResolvedValueOnce({
+      targetKind: "task",
+      targetId: "task-1",
+      title: "Prepare the final demo",
+      cancelled: false,
+    });
+
+    await processTelegramUpdate(
+      {} as SupabaseClient,
+      { ...baseMessage, text: "Prepare the final demo" },
+      gateway,
+    );
+
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      "✅ Updated title to: Prepare the final demo",
+      { replyToMessageId: 2 },
+    );
+    expect(messageBatching.coalesceRapidTelegramMessages).not.toHaveBeenCalled();
+    expect(eventPipeline.detectAndPersistProjectEvent).not.toHaveBeenCalled();
+  });
+
+  it("completes a selected task through a one-tap callback", async () => {
+    const gateway = gatewayMock();
+    const task = {
+      id: "task-1",
+      project_id: "project-1",
+      project_name: "Launch",
+      title: "Prepare the demo",
+      description: null,
+      status: "doing",
+      priority: "high",
+      source_participant_name: "Alex Tan",
+      due_label: "Tomorrow",
+      due_at: "2026-08-02T10:00:00.000Z",
+      blocked_by: null,
+      owner_telegram_user_id: "user-1",
+      updated_at: "2026-08-01T00:00:00.000Z",
+    };
+    repository.getTaskForTelegramContext.mockResolvedValue(task);
+    repository.updateTaskStatusFromTelegram.mockResolvedValue({
+      ...task,
+      status: "done",
+    });
+    const update: TelegramInboundCallback = {
+      kind: "callback_query",
+      updateId: 30,
+      updateType: "callback_query",
+      callbackQueryId: "callback-30",
+      data: taskActionCallbackData("complete", "task-1"),
+      chat: baseMessage.chat,
+      actor: baseMessage.actor!,
+      messageId: 200,
+      raw: {},
+    };
+
+    await processTelegramUpdate({} as SupabaseClient, update, gateway);
+
+    expect(repository.updateTaskStatusFromTelegram).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ projectId: "project-1" }),
+      task,
+      "done",
+    );
+    expect(gateway.answerCallback).toHaveBeenCalledWith(
+      "callback-30",
+      "Task completed",
+    );
+    expect(gateway.sendMessage).toHaveBeenCalledWith(
+      -10,
+      expect.stringMatching(/Prepare the demo[\s\S]*Status: done/),
+      expect.objectContaining({ replyMarkup: expect.any(Object) }),
+    );
+  });
 });
 
 function gatewayMock(): TelegramGateway {
@@ -508,5 +670,6 @@ function gatewayMock(): TelegramGateway {
     sendMessage: vi.fn().mockResolvedValue({ sent: true }),
     answerCallback: vi.fn().mockResolvedValue({ sent: true }),
     clearKeyboard: vi.fn().mockResolvedValue({ sent: true }),
+    reactToMessage: vi.fn().mockResolvedValue({ sent: true }),
   };
 }

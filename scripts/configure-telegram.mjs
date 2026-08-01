@@ -35,6 +35,7 @@ await setCommands(
     { command: "kpi", description: "Show confirmed project metrics" },
     { command: "tasks", description: "Browse active project tasks" },
     { command: "mytasks", description: "Browse your tasks in this project" },
+    { command: "undo", description: "Reverse the latest task change" },
   ],
 );
 

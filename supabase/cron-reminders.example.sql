@@ -15,3 +15,19 @@ select cron.schedule(
     );
   $$
 );
+
+-- 20:00 Asia/Singapore is 12:00 UTC throughout the year.
+-- This job sends one deduplicated project report per active Telegram group,
+-- including progress, urgent work, ownership, blockers and a seven-day outlook.
+select cron.schedule(
+  'taskgoblin-daily-project-report',
+  '0 12 * * *',
+  $$
+    select net.http_get(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'taskgoblin_app_url') || '/api/cron/project-reports',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'taskgoblin_cron_secret')
+      )
+    );
+  $$
+);

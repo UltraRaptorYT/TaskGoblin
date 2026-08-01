@@ -7,12 +7,26 @@ import {
   parseBulkAssignmentCallbackData,
   parseCandidateBatchCallbackData,
   parseCandidateCallbackData,
+  parseCandidateDeadlineCallbackData,
+  parseCandidateEditCallbackData,
+  parseEditSessionChoiceCallbackData,
+  parseProjectHomeCallbackData,
   parseProjectEventCandidateCallbackData,
   parseProjectNameCallbackData,
   parseTaskViewCallbackData,
+  parseTaskActionCallbackData,
+  parseTaskDeadlineCallbackData,
+  parseTaskSnoozeCallbackData,
+  candidateDeadlineCallbackData,
+  candidateEditCallbackData,
+  editSessionChoiceCallbackData,
+  projectHomeCallbackData,
   projectEventCandidateCallbackData,
   projectNameCallbackData,
   taskViewCallbackData,
+  taskActionCallbackData,
+  taskDeadlineCallbackData,
+  taskSnoozeCallbackData,
 } from "@/lib/telegram-callbacks";
 import {
   handleBulkAssignmentCallback,
@@ -51,6 +65,37 @@ describe("candidate callbacks", () => {
     const value = taskViewCallbackData("task-1");
     expect(parseTaskViewCallbackData(value)).toEqual({ taskId: "task-1" });
     expect(parseTaskViewCallbackData("tg:t:v:bad task")).toBeNull();
+  });
+
+  it("round-trips task actions, deadline presets, and snooze controls", () => {
+    expect(
+      parseTaskActionCallbackData(taskActionCallbackData("complete", "task-1")),
+    ).toEqual({ action: "complete", taskId: "task-1" });
+    expect(
+      parseTaskDeadlineCallbackData(taskDeadlineCallbackData("tomorrow", "task-1")),
+    ).toEqual({ preset: "tomorrow", taskId: "task-1" });
+    expect(
+      parseTaskSnoozeCallbackData(taskSnoozeCallbackData("one_hour", "task-1")),
+    ).toEqual({ preset: "one_hour", taskId: "task-1" });
+  });
+
+  it("round-trips project home and candidate edit controls", () => {
+    expect(parseProjectHomeCallbackData(projectHomeCallbackData("due_today"))).toEqual({
+      action: "due_today",
+    });
+    expect(
+      parseCandidateEditCallbackData(candidateEditCallbackData("owner", candidateId)),
+    ).toEqual({ field: "owner", candidateId });
+    expect(
+      parseCandidateDeadlineCallbackData(
+        candidateDeadlineCallbackData("next_week", candidateId),
+      ),
+    ).toEqual({ preset: "next_week", candidateId });
+    expect(
+      parseEditSessionChoiceCallbackData(
+        editSessionChoiceCallbackData(candidateId, 3),
+      ),
+    ).toEqual({ optionIndex: 3, sessionId: candidateId });
   });
 
   it("round-trips batch and project-name review callbacks", () => {

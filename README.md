@@ -73,6 +73,10 @@ The Telegram document-context migration stores private metadata and extracted
 text for supported files shared in project groups. Binary files are downloaded
 from Telegram only for parsing and are not retained by TaskGoblin.
 
+The inline-interaction migration adds short-lived, service-role-only edit
+sessions. These sessions let a member change one task or candidate field from
+Telegram without treating the next free-text reply as a new project event.
+
 A new group is provisioned with a workspace and project when its first update
 is processed. This is an MVP default and can later be replaced by an explicit
 admin linking flow.
@@ -98,8 +102,12 @@ Configure Telegram to send the secret in
 - `/kpi`
 - `/tasks`
 - `/mytasks`
+- `/undo`
 - project-event Confirm, Edit and Ignore callbacks
-- inline task-selection callbacks
+- a project home menu for open tasks, work due today, calendar, and settings
+- task cards with Complete/Reopen, title, owner, and deadline controls
+- actionable reminder cards with Done, Snooze, and Change deadline controls
+- guided candidate title, owner, and deadline editing
 - project-group PDF, DOCX, TXT and MD context ingestion
 
 After deployment, configure both the command menus and webhook update types:
@@ -118,6 +126,22 @@ link their Telegram identity to the project. Members must also open the bot
 privately and press Start once before Telegram will allow private reminders.
 In a private bot chat, `/mytasks` groups the requesting user's confirmed tasks
 across every TaskGoblin project.
+
+`/undo` reverses the latest task mutation in the current project group. Task
+changes are recorded in transaction-sized groups, so one bulk assignment is
+undone as one action. A confidently matched explicit completion is applied
+without an extra confirmation message: TaskGoblin reacts with ✅, marks the
+task done, and attributes it to the member who completed it.
+
+The project-report cron route sends one deduplicated report per active group at
+20:00 Asia/Singapore. It includes progress, urgent and overdue work, ownership,
+blockers, and a seven-day outlook. The existing due-reminder cron remains
+frequent so deadline reminders are not delayed until the evening report.
+
+Inline title and owner editing uses a 10-minute edit session. Apply
+`supabase/migrations/20260801064358_telegram_inline_edit_sessions.sql` before
+deploying these controls. The table has RLS enabled and is granted only to the
+server-side `service_role`; browser clients cannot access edit sessions.
 
 Rapid non-command group messages from the same member are coalesced for
 `TELEGRAM_MESSAGE_DEBOUNCE_MS` (2.5 seconds by default, capped at 5 seconds).

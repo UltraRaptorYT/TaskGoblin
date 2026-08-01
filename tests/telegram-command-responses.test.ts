@@ -71,7 +71,7 @@ describe("Telegram project command responses", () => {
     expect(response.text).toContain(
       "https://taskgoblin.vercel.app/dashboard/projects/project-1",
     );
-    expect(response.replyMarkup?.inline_keyboard).toHaveLength(5);
+    expect(response.replyMarkup?.inline_keyboard).toHaveLength(7);
     expect(response.replyMarkup?.inline_keyboard.at(-1)?.[0]).toMatchObject({
       text: "🌐 Open Website Launch",
       url: "https://taskgoblin.vercel.app/dashboard/projects/project-1",

@@ -11,7 +11,7 @@
   "aspectRatio": "16:9",
   "fps": 30,
   "quality": "draft",
-  "prompt": "Create a polished 90-second illustrated product advert for TaskGoblin, a Telegram-native AI project manager. Use stylised Telegram-like conversations, animated task cards, project-memory diagrams, confirmation buttons, document icons, reminders, and a dark TaskGoblin dashboard rather than recorded product footage. Open with useful commitments disappearing inside a noisy group chat. Show TaskGoblin noticing a concrete assignment, resolving the owner only from known group members, checking project context, and creating a reviewable candidate. Make the safety boundary visible: AI suggestions are persisted for human confirmation and never silently mutate consequential project state. Show current capabilities only: group onboarding, member linking, task proposals, assignments, progress, possible completion, deadline, blocker and decision detection; multi-task proposal batches; PDF, DOCX, TXT and MD project context; private Telegram reminders; /start, /help, /summary, /project, /kpi, /tasks and /mytasks; Telegram web login; project dashboard; list, Kanban and calendar views; and authorised task creation and editing. Do not show /recent, /addtask, /done, /update, /setproject or /addmilestone. Do not present TaskGoblin as an autonomous coding agent. Use an evidence-led hackathon tone: focused, intelligent, trustworthy and lightly playful. Finish with the line 'Turn conversation into accountable project memory' and the URL 'taskgoblin.vercel.app'.",
+  "prompt": "Create a polished 90-second illustrated product advert for TaskGoblin, a Telegram-native AI project manager. Use stylised Telegram-like conversations, animated task cards, project-memory diagrams, confirmation buttons, document icons, reminders, and a dark TaskGoblin dashboard rather than recorded product footage. Open with useful commitments disappearing inside a noisy group chat. Show TaskGoblin noticing a concrete assignment, resolving the owner only from known group members, checking project context, and creating a reviewable candidate. Make the safety boundary visible: most consequential AI suggestions wait for human confirmation. When a member explicitly completes a confidently matched task, TaskGoblin updates it through a controlled workflow, transfers ownership to the person who completed it, and reacts to the source message with a green check. Show /undo reversing the latest mistaken task change. Show the daily 8pm Singapore project report with progress, urgent work, blockers, owners and a seven-day outlook. Show current capabilities only: group onboarding, member linking, task proposals, assignments, progress, completion, deadline, blocker and decision detection; multi-task proposal batches; PDF, DOCX, TXT and MD project context; private Telegram reminders; /start, /help, /summary, /project, /kpi, /tasks, /mytasks and /undo; Telegram web login; project dashboard; list, Kanban and calendar views; and authorised task creation and editing. Do not show /recent, /addtask, /done, /update, /setproject or /addmilestone. Do not present TaskGoblin as an autonomous coding agent. Use an evidence-led hackathon tone: focused, intelligent, trustworthy and lightly playful. Finish with the line 'Turn conversation into accountable project memory' and the URL 'taskgoblin.vercel.app'.",
   "creativeDirection": {
     "format": "illustrated product explainer",
     "tone": [
@@ -43,7 +43,7 @@
     "voiceId": "am_adam",
     "speed": 1.08,
     "language": "en-us",
-    "script": "Project work already happens in chat. Someone accepts a task, a deadline changes, a blocker appears—and moments later, the commitment is buried beneath the conversation. TaskGoblin turns permitted Telegram group messages into persistent, reviewable project memory. It detects high-signal events such as task proposals, assignments, progress, possible completions, deadlines, blockers and decisions. But the model does not get to rewrite the project by itself. TaskGoblin checks known members, existing tasks, recent context and likely duplicates, then preserves the source message and asks the team to review consequential changes. Share a PDF, Word document, text file or Markdown brief, and TaskGoblin can use the extracted content as bounded project context. It can propose several tasks from one request, send private deadline reminders, and answer follow-up questions using the relevant task and project. Deterministic commands provide summaries, project context, KPIs, active tasks and each member's work across projects. Confirmed information also appears in a Telegram-authenticated dashboard with project health, editable tasks, a Kanban board and a calendar. TaskGoblin is a working prototype, not an autonomous coding agent. It keeps humans in control while reducing the work of turning conversation into execution. TaskGoblin. Turn conversation into accountable project memory."
+    "script": "Project work already happens in chat. Someone accepts a task, a deadline changes, a blocker appears—and moments later, the commitment is buried beneath the conversation. TaskGoblin turns permitted Telegram group messages into persistent project memory. It detects high-signal events such as proposals, assignments, progress, completions, deadlines, blockers and decisions. Most consequential suggestions remain reviewable: TaskGoblin checks known members, existing tasks, recent context and likely duplicates, preserves the source message, then asks the team to confirm. Explicit completion is faster. When a confidently matched task is finished, TaskGoblin reacts with a green check, marks it complete, and records the member who actually did the work as its owner. If the latest task change was wrong, slash undo restores the previous state. Share a PDF, Word document, text file or Markdown brief, and TaskGoblin uses its extracted content as bounded project context. It can propose several tasks, send private deadline reminders, and answer grounded follow-ups. Every day at eight PM Singapore time, the project group receives a report showing progress, urgent work, blockers, ownership and the next seven days. Confirmed information also appears in a Telegram-authenticated dashboard with editable tasks, project health, a Kanban board and a calendar. TaskGoblin keeps humans in control while turning conversation into accountable project memory."
   },
   "music": {
     "provider": "none",
@@ -69,7 +69,8 @@
       "/project",
       "/kpi",
       "/tasks",
-      "/mytasks"
+      "/mytasks",
+      "/undo"
     ],
     "eventDetection": [
       "task proposal",
@@ -88,6 +89,9 @@
       "multi-task proposal batches",
       "rapid-message context coalescing",
       "private scheduled reminders",
+      "daily 8pm Singapore project reports with a seven-day outlook",
+      "completion reactions with completing-member ownership attribution",
+      "reversible latest task mutations through /undo",
       "project-grounded reminder follow-up advice",
       "PDF, DOCX, TXT and MD context ingestion up to 15 MB"
     ],
@@ -143,11 +147,11 @@
       "id": "human-control",
       "startSeconds": 23,
       "endSeconds": 35,
-      "purpose": "Explain the trust and safety boundary.",
-      "visuals": "A source-linked candidate card displays concise rationale and confidence. Confirm and Ignore controls appear. The database icon remains locked until a human confirms.",
+      "purpose": "Explain confirmation, completion attribution and undo.",
+      "visuals": "A source-linked candidate card displays concise rationale and confidence. Confirm and Ignore controls appear for an inferred assignment. Beside it, an explicit completion message receives a green check reaction; its task moves to Done and the owner changes to the member who completed it. A quick /undo restores the earlier state.",
       "onScreenText": [
-        "AI PROPOSES. PEOPLE CONFIRM.",
-        "No silent project mutations."
+        "REVIEW WHEN AMBIGUOUS. UPDATE WHEN EXPLICIT.",
+        "Completion attribution • /undo"
       ],
       "transition": "A confirmed card clicks into the project-memory timeline."
     },
@@ -168,10 +172,10 @@
       "startSeconds": 47,
       "endSeconds": 60,
       "purpose": "Show the implemented Telegram-native workflow.",
-      "visuals": "Animate group onboarding, member linking, a concise /summary response, an interactive /tasks selection, and a private deadline reminder.",
+      "visuals": "Animate group onboarding, member linking, a concise /summary response, an interactive /tasks selection, a private deadline reminder, and an 8pm group report covering urgent work, ownership, progress and the next seven days.",
       "onScreenText": [
-        "/summary  /project  /kpi  /tasks  /mytasks",
-        "Work stays where the team talks."
+        "/summary  /project  /kpi  /tasks  /mytasks  /undo",
+        "Private reminders + daily 8pm project report"
       ],
       "transition": "A dashboard link expands into the website."
     },

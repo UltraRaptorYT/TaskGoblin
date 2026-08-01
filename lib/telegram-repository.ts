@@ -95,6 +95,34 @@ export type BulkAssignmentReviewResult = {
   assignedTaskCount: number;
 };
 
+export type UndoTaskMutationResult = {
+  transactionId: number;
+  affectedTaskCount: number;
+  description: string;
+};
+
+export type TelegramProjectMemberOption = {
+  telegramUserRecordId: string;
+  displayName: string;
+};
+
+export type TelegramEditTargetKind = "task" | "project_event_candidate";
+
+export type TelegramEditSession = {
+  id: string;
+  targetKind: TelegramEditTargetKind;
+  targetId: string;
+  fieldName: "title" | "owner";
+  options: TelegramProjectMemberOption[];
+};
+
+export type TelegramTitleEditResult = {
+  targetKind: TelegramEditTargetKind;
+  targetId: string;
+  title: string;
+  cancelled: boolean;
+};
+
 export type ProjectSummaryKnowledge = {
   documentNames: string[];
   recentEvents: Array<{ eventType: string; title: string }>;
@@ -1030,15 +1058,35 @@ export async function reviewProjectEventCandidate(
   if (!context.projectId) {
     throw new Error("Project event candidate has no project.");
   }
-  const { data, error } = await supabase.rpc(
-    "taskgoblin_transition_project_event_candidate",
-    {
-      p_candidate_id: candidateId,
-      p_project_id: context.projectId,
-      p_action: action,
-      p_reviewer_telegram_user_id: context.userRecordId,
-    },
-  );
+  let rpcName = "taskgoblin_transition_project_event_candidate";
+  let rpcArguments: Record<string, string | null> = {
+    p_candidate_id: candidateId,
+    p_project_id: context.projectId,
+    p_action: action,
+    p_reviewer_telegram_user_id: context.userRecordId,
+  };
+  if (action === "confirm" && context.userRecordId) {
+    const { data: candidate, error: candidateError } = await supabase
+      .from("taskgoblin_project_event_candidates")
+      .select("event_type")
+      .eq("id", candidateId)
+      .eq("project_id", context.projectId)
+      .single();
+    if (candidateError || !candidate) {
+      throw new Error(
+        `Could not load project event candidate: ${candidateError?.message ?? "Unknown error"}`,
+      );
+    }
+    if (candidate.event_type === "possible_task_completion") {
+      rpcName = "taskgoblin_confirm_completion_candidate";
+      rpcArguments = {
+        p_candidate_id: candidateId,
+        p_project_id: context.projectId,
+        p_reviewer_telegram_user_id: context.userRecordId,
+      };
+    }
+  }
+  const { data, error } = await supabase.rpc(rpcName, rpcArguments);
   if (error || !Array.isArray(data) || data.length !== 1) {
     throw new Error(
       `Could not review project event candidate: ${error?.message ?? "Unknown error"}`,
@@ -1076,6 +1124,34 @@ export async function reviewProjectEventCandidate(
     eventType: row.event_type,
     summary: row.summary,
     reminderScheduledFor,
+  };
+}
+
+export async function undoLastTaskMutation(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+): Promise<UndoTaskMutationResult | null> {
+  if (!context.projectId || !context.userRecordId) {
+    throw new Error("Undo needs a linked TaskGoblin project member.");
+  }
+  const { data, error } = await supabase.rpc(
+    "taskgoblin_undo_last_task_mutation",
+    {
+      p_project_id: context.projectId,
+      p_reviewer_telegram_user_id: context.userRecordId,
+    },
+  );
+  if (error) throw new Error(`Could not undo task change: ${error.message}`);
+  if (!Array.isArray(data) || data.length === 0) return null;
+  const row = data[0] as {
+    transaction_id: number | string;
+    affected_task_count: number | string;
+    description: string;
+  };
+  return {
+    transactionId: Number(row.transaction_id),
+    affectedTaskCount: Number(row.affected_task_count),
+    description: row.description,
   };
 }
 
@@ -1499,6 +1575,322 @@ export async function getTaskForTelegramContext(
     ...(task as TelegramTaskRow),
     project_name: project.name as string,
   };
+}
+
+export async function updateTaskStatusFromTelegram(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  task: TelegramUserTaskRow,
+  status: "done" | "todo",
+): Promise<TelegramUserTaskRow> {
+  if (!context.userRecordId) {
+    throw new Error("Task updates need a linked Telegram member.");
+  }
+  const patch =
+    status === "done"
+      ? {
+          status,
+          blocked_by: null,
+          owner_telegram_user_id: context.userRecordId,
+          source_participant_name:
+            context.displayName?.trim() || task.source_participant_name,
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          status,
+          blocked_by: null,
+          updated_at: new Date().toISOString(),
+        };
+  let query = supabase
+    .from("taskgoblin_tasks")
+    .update(patch)
+    .eq("id", task.id)
+    .eq("project_id", task.project_id);
+  if (!context.projectId) {
+    query = query.eq("owner_telegram_user_id", context.userRecordId);
+  }
+  const { error } = await query;
+  if (error) throw new Error(`Could not update task status: ${error.message}`);
+  const refreshed = await getTaskForTelegramContext(supabase, context, task.id);
+  if (!refreshed) throw new Error("Updated task is no longer available.");
+  return refreshed;
+}
+
+export async function updateTaskDeadlineFromTelegram(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  task: TelegramUserTaskRow,
+  deadline: { dueLabel: string | null; dueAt: string | null },
+) {
+  if (!context.userRecordId) {
+    throw new Error("Deadline updates need a linked Telegram member.");
+  }
+  let query = supabase
+    .from("taskgoblin_tasks")
+    .update({
+      due_label: deadline.dueLabel,
+      due_at: deadline.dueAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", task.id)
+    .eq("project_id", task.project_id);
+  if (!context.projectId) {
+    query = query.eq("owner_telegram_user_id", context.userRecordId);
+  }
+  const { error } = await query;
+  if (error) throw new Error(`Could not update task deadline: ${error.message}`);
+  return getTaskForTelegramContext(supabase, context, task.id);
+}
+
+export async function updateCandidateDeadlineFromTelegram(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  candidateId: string,
+  deadline: { dueLabel: string | null; dueAt: string | null },
+) {
+  if (!context.projectId || !context.userRecordId) {
+    throw new Error("Candidate editing needs a linked project member.");
+  }
+  const { data, error } = await supabase
+    .from("taskgoblin_project_event_candidates")
+    .update({
+      proposed_due_label: deadline.dueLabel,
+      proposed_due_at: deadline.dueAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", candidateId)
+    .eq("project_id", context.projectId)
+    .eq("state", "awaiting_confirmation")
+    .select("id, summary, proposed_due_label")
+    .single();
+  if (error || !data) {
+    throw new Error(
+      `Could not update candidate deadline: ${error?.message ?? "Candidate is no longer editable."}`,
+    );
+  }
+  return {
+    id: data.id as string,
+    summary: data.summary as string,
+    dueLabel: (data.proposed_due_label as string | null) ?? null,
+  };
+}
+
+export async function startTelegramEditSession(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  input: {
+    targetKind: TelegramEditTargetKind;
+    targetId: string;
+    fieldName: "title" | "owner";
+  },
+): Promise<TelegramEditSession> {
+  if (!context.projectId || !context.chatRecordId || !context.userRecordId) {
+    throw new Error("Inline editing needs a linked project group member.");
+  }
+  const options =
+    input.fieldName === "owner"
+      ? await listProjectMemberOptions(supabase, context.projectId)
+      : [];
+  const { error: closeError } = await supabase
+    .from("taskgoblin_telegram_edit_sessions")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("telegram_chat_record_id", context.chatRecordId)
+    .eq("telegram_user_id", context.userRecordId)
+    .is("consumed_at", null);
+  if (closeError) {
+    throw new Error(`Could not close the previous edit: ${closeError.message}`);
+  }
+  const { data, error } = await supabase
+    .from("taskgoblin_telegram_edit_sessions")
+    .insert({
+      project_id: context.projectId,
+      telegram_chat_record_id: context.chatRecordId,
+      telegram_user_id: context.userRecordId,
+      target_kind: input.targetKind,
+      target_id: input.targetId,
+      field_name: input.fieldName,
+      payload: { options },
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    throw new Error(
+      `Could not start inline editing: ${error?.message ?? "Unknown error"}`,
+    );
+  }
+  return {
+    id: data.id as string,
+    targetKind: input.targetKind,
+    targetId: input.targetId,
+    fieldName: input.fieldName,
+    options,
+  };
+}
+
+export async function consumeTelegramTitleEdit(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  text: string,
+): Promise<TelegramTitleEditResult | null> {
+  if (!context.chatRecordId || !context.userRecordId) return null;
+  const { data: session, error } = await supabase
+    .from("taskgoblin_telegram_edit_sessions")
+    .select("id, project_id, target_kind, target_id")
+    .eq("telegram_chat_record_id", context.chatRecordId)
+    .eq("telegram_user_id", context.userRecordId)
+    .eq("field_name", "title")
+    .is("consumed_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load inline edit: ${error.message}`);
+  if (!session) return null;
+
+  const cancelled = text.trim().toLowerCase() === "/cancel";
+  const title = text.replace(/\s+/g, " ").trim().slice(0, 160);
+  if (!cancelled && title.length < 2) {
+    throw new Error("The task title must contain at least two characters.");
+  }
+  if (!cancelled) {
+    if (session.target_kind === "task") {
+      const { error: updateError } = await supabase
+        .from("taskgoblin_tasks")
+        .update({ title, updated_at: new Date().toISOString() })
+        .eq("id", session.target_id)
+        .eq("project_id", session.project_id);
+      if (updateError) {
+        throw new Error(`Could not update task title: ${updateError.message}`);
+      }
+    } else {
+      const { error: updateError } = await supabase
+        .from("taskgoblin_project_event_candidates")
+        .update({ summary: title, updated_at: new Date().toISOString() })
+        .eq("id", session.target_id)
+        .eq("project_id", session.project_id)
+        .eq("state", "awaiting_confirmation");
+      if (updateError) {
+        throw new Error(`Could not update candidate title: ${updateError.message}`);
+      }
+    }
+  }
+  await supabase
+    .from("taskgoblin_telegram_edit_sessions")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("id", session.id)
+    .is("consumed_at", null);
+  return {
+    targetKind: session.target_kind as TelegramEditTargetKind,
+    targetId: session.target_id as string,
+    title,
+    cancelled,
+  };
+}
+
+export async function applyTelegramOwnerChoice(
+  supabase: SupabaseClient,
+  context: TelegramContext,
+  sessionId: string,
+  optionIndex: number,
+) {
+  if (!context.chatRecordId || !context.userRecordId) {
+    throw new Error("Owner editing needs a linked Telegram member.");
+  }
+  const { data: session, error } = await supabase
+    .from("taskgoblin_telegram_edit_sessions")
+    .select("id, project_id, target_kind, target_id, field_name, payload")
+    .eq("id", sessionId)
+    .eq("telegram_chat_record_id", context.chatRecordId)
+    .eq("telegram_user_id", context.userRecordId)
+    .eq("field_name", "owner")
+    .is("consumed_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+  if (error || !session) {
+    throw new Error("This owner selection has expired.");
+  }
+  const options = Array.isArray(session.payload?.options)
+    ? (session.payload.options as TelegramProjectMemberOption[])
+    : [];
+  const owner = options[optionIndex];
+  if (!owner) throw new Error("This owner selection is invalid.");
+  const currentOwner = await getProjectMemberOwner(
+    supabase,
+    session.project_id as string,
+    owner.telegramUserRecordId,
+  );
+  if (!currentOwner) throw new Error("That member is no longer in this project.");
+
+  if (session.target_kind === "task") {
+    const { error: updateError } = await supabase
+      .from("taskgoblin_tasks")
+      .update({
+        owner_telegram_user_id: currentOwner.telegramUserRecordId,
+        source_participant_name: currentOwner.displayName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", session.target_id)
+      .eq("project_id", session.project_id);
+    if (updateError) {
+      throw new Error(`Could not change task owner: ${updateError.message}`);
+    }
+  } else {
+    const { error: updateError } = await supabase
+      .from("taskgoblin_project_event_candidates")
+      .update({
+        proposed_owner_telegram_user_id: currentOwner.telegramUserRecordId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", session.target_id)
+      .eq("project_id", session.project_id)
+      .eq("state", "awaiting_confirmation");
+    if (updateError) {
+      throw new Error(`Could not change candidate owner: ${updateError.message}`);
+    }
+  }
+  await supabase
+    .from("taskgoblin_telegram_edit_sessions")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("id", session.id)
+    .is("consumed_at", null);
+  return {
+    targetKind: session.target_kind as TelegramEditTargetKind,
+    targetId: session.target_id as string,
+    owner: currentOwner,
+  };
+}
+
+export async function snoozeTaskReminder(
+  supabase: SupabaseClient,
+  task: TelegramUserTaskRow,
+  scheduledFor: string,
+) {
+  const { error } = await supabase.from("taskgoblin_reminders").insert({
+    task_id: task.id,
+    channel: "telegram",
+    tone: "friendly",
+    message: "",
+    scheduled_for: scheduledFor,
+    status: "scheduled",
+  });
+  if (error) throw new Error(`Could not snooze reminder: ${error.message}`);
+}
+
+export async function listProjectMemberOptions(
+  supabase: SupabaseClient,
+  projectId: string,
+): Promise<TelegramProjectMemberOption[]> {
+  const { data, error } = await supabase
+    .from("taskgoblin_project_members")
+    .select("telegram_user_id, display_name")
+    .eq("project_id", projectId)
+    .order("display_name", { ascending: true })
+    .limit(20);
+  if (error) throw new Error(`Could not load project members: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    telegramUserRecordId: row.telegram_user_id as string,
+    displayName: row.display_name as string,
+  }));
 }
 
 export async function completeTelegramUpdate(

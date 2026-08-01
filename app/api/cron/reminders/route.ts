@@ -6,6 +6,7 @@ import {
   sendTelegramMessage,
   type TelegramDelivery,
 } from "@/lib/telegram-bot";
+import { taskActionCallbackData } from "@/lib/telegram-callbacks";
 import type { AccountabilityTone, TaskItem } from "@/lib/taskgoblin-types";
 
 type ReminderTaskRow = {
@@ -108,7 +109,31 @@ export async function GET(request: Request) {
         recipientTelegramChatId = recipientId;
         const task = taskItem(row);
         message = await generateAccountabilityMessage(task, reminder.tone);
-        delivery = await sendTelegramMessage(recipientId, message);
+        delivery = await sendTelegramMessage(recipientId, message, {
+          replyMarkup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "✅ Done",
+                  callback_data: taskActionCallbackData("complete", row.id),
+                },
+                {
+                  text: "⏰ Snooze",
+                  callback_data: taskActionCallbackData("snooze", row.id),
+                },
+              ],
+              [
+                {
+                  text: "📅 Change deadline",
+                  callback_data: taskActionCallbackData(
+                    "edit_deadline",
+                    row.id,
+                  ),
+                },
+              ],
+            ],
+          },
+        });
       }
     }
 

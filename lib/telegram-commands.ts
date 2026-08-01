@@ -6,6 +6,7 @@ export const TELEGRAM_COMMANDS = [
   "kpi",
   "tasks",
   "mytasks",
+  "undo",
 ] as const;
 
 export type TelegramCommandName = (typeof TELEGRAM_COMMANDS)[number];
@@ -56,6 +57,7 @@ export function helpMessage() {
     "/kpi — show metrics calculated from confirmed tasks",
     "/tasks — browse active confirmed tasks",
     "/mytasks — browse your tasks; private chat includes every project",
+    "/undo — reverse the most recent task change in this project",
     "",
     "TaskGoblin watches high-signal project commitments and asks before creating a task.",
   ].join("\n");

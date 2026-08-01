@@ -4,25 +4,43 @@ import {
   answerTelegramCallbackQuery,
   clearTelegramInlineKeyboard,
   sendTelegramMessage,
+  setTelegramMessageReaction,
   type TelegramDelivery,
   type TelegramSendOptions,
 } from "@/lib/telegram-bot";
 import {
+  candidateDeadlineCallbackData,
+  candidateEditCallbackData,
+  editSessionChoiceCallbackData,
   parseBulkAssignmentCallbackData,
   parseCandidateBatchCallbackData,
   parseCandidateCallbackData,
+  parseCandidateDeadlineCallbackData,
+  parseCandidateEditCallbackData,
+  parseEditSessionChoiceCallbackData,
+  parseProjectHomeCallbackData,
   parseProjectEventCandidateCallbackData,
   parseProjectNameCallbackData,
+  parseTaskActionCallbackData,
+  parseTaskDeadlineCallbackData,
+  parseTaskSnoozeCallbackData,
   parseTaskViewCallbackData,
   projectEventCandidateCallbackData,
+  taskDeadlineCallbackData,
+  taskSnoozeCallbackData,
   type CandidateCallbackAction,
 } from "@/lib/telegram-callbacks";
 import {
+  dueTodayResponse,
   groupMyTasksResponse,
   kpiResponse,
   privateMyTasksResponse,
+  projectHomeMenu,
+  projectHomeResponse,
   projectResponse,
+  settingsResponse,
   summaryResponse,
+  taskDetailResponse,
   taskDetailMessage,
   tasksResponse,
   type TelegramCommandResponse,
@@ -35,8 +53,10 @@ import {
 } from "@/lib/telegram-commands";
 import { coalesceRapidTelegramMessages } from "@/lib/telegram-message-batching";
 import {
+  applyTelegramOwnerChoice,
   claimTelegramUpdate,
   completeTelegramUpdate,
+  consumeTelegramTitleEdit,
   ensureTelegramContext,
   failTelegramUpdate,
   getTaskForTelegramContext,
@@ -45,6 +65,8 @@ import {
   linkPersistedTelegramMessageToProject,
   listProjectTasks,
   listTelegramUserTasks,
+  snoozeTaskReminder,
+  startTelegramEditSession,
   persistTelegramProjectDocument,
   persistTelegramMessage,
   reviewAgentTaskCandidateBatch,
@@ -55,6 +77,10 @@ import {
   resolvePrivateReminderReplyContext,
   resolveRecentPrivateReminderContext,
   updatePersistedTelegramMessageText,
+  updateCandidateDeadlineFromTelegram,
+  updateTaskDeadlineFromTelegram,
+  updateTaskStatusFromTelegram,
+  undoLastTaskMutation,
   type CandidateBatchReviewResult,
   type BulkAssignmentReviewResult,
   type CandidateReviewResult,
@@ -65,6 +91,10 @@ import {
   type TelegramPrivateReplyContext,
   type TelegramUserTaskRow,
 } from "@/lib/telegram-repository";
+import {
+  deadlineFromPreset,
+  snoozeFromPreset,
+} from "@/lib/telegram-interaction-time";
 import {
   displayFilename,
   documentMessageText,
@@ -98,13 +128,21 @@ export type TelegramGateway = {
     chatId: string | number,
     messageId: number,
   ) => Promise<TelegramDelivery>;
+  reactToMessage?: (
+    chatId: string | number,
+    messageId: number,
+    emoji?: string,
+  ) => Promise<TelegramDelivery>;
 };
 
 const defaultGateway: TelegramGateway = {
   sendMessage: sendTelegramMessage,
   answerCallback: answerTelegramCallbackQuery,
   clearKeyboard: clearTelegramInlineKeyboard,
+  reactToMessage: setTelegramMessageReaction,
 };
+
+const AUTO_COMPLETION_CONFIDENCE = 0.85;
 
 export async function processTelegramUpdate(
   supabase: SupabaseClient,
@@ -126,6 +164,11 @@ export async function processTelegramUpdate(
           process.env.TELEGRAM_BOT_USERNAME,
           context.projectId,
         ),
+        {
+          replyMarkup: context.projectId
+            ? projectHomeMenu({ id: context.projectId, name: "Project" })
+            : undefined,
+        },
       );
       replySent = delivery.sent;
     } else if (update.kind === "message") {
@@ -215,10 +258,19 @@ export async function processTelegramUpdate(
           );
       let effectiveContext = context;
       let supersededByRapidMessage = false;
+      const inlineTitleEdit =
+        !command && !onboardingReply && !update.document
+          ? await consumeTelegramTitleEdit(
+              supabase,
+              context,
+              detectionMessage.text,
+            )
+          : null;
 
       if (
         !command &&
         !onboardingReply &&
+        !inlineTitleEdit &&
         !documentFailed &&
         update.chat.type === "private" &&
         context.userRecordId
@@ -253,7 +305,7 @@ export async function processTelegramUpdate(
         }
       }
 
-      if (!command && !onboardingReply && !documentFailed) {
+      if (!command && !onboardingReply && !inlineTitleEdit && !documentFailed) {
         const batch = await coalesceRapidTelegramMessages(
           supabase,
           effectiveContext,
@@ -266,6 +318,7 @@ export async function processTelegramUpdate(
       const explicitProjectAction =
         !command &&
         !onboardingReply &&
+        !inlineTitleEdit &&
         !documentFailed &&
         !supersededByRapidMessage &&
         effectiveContext.projectId
@@ -277,12 +330,24 @@ export async function processTelegramUpdate(
             )
           : null;
 
-      if (onboardingReply) {
+      if (inlineTitleEdit) {
+        const delivery = await gateway.sendMessage(
+          update.chat.id,
+          inlineTitleEdit.cancelled
+            ? "Editing cancelled."
+            : `✅ Updated title to: ${inlineTitleEdit.title}`,
+          { replyToMessageId: update.messageId },
+        );
+        replySent = delivery.sent;
+      } else if (onboardingReply) {
         const delivery = await gateway.sendMessage(
           update.chat.id,
           onboardingReply,
           {
             replyToMessageId: update.messageId,
+            replyMarkup: context.projectId
+              ? projectHomeMenu({ id: context.projectId, name: "Project" })
+              : undefined,
           },
         );
         replySent = delivery.sent;
@@ -350,44 +415,81 @@ export async function processTelegramUpdate(
           detectionMessage,
         );
         if (candidate) {
-          const delivery = await gateway.sendMessage(
-            update.chat.id,
-            projectEventCandidateMessage(candidate),
-            {
-              replyToMessageId: update.messageId,
-              replyMarkup: {
-                inline_keyboard: [
-                  [
-                    {
-                      text: projectEventConfirmLabel(candidate.eventType),
-                      callback_data: projectEventCandidateCallbackData(
-                        "confirm",
-                        candidate.id,
-                      ),
-                    },
-                    {
-                      text: "Edit",
-                      callback_data: projectEventCandidateCallbackData(
-                        "edit",
-                        candidate.id,
-                      ),
-                    },
-                    {
-                      text: "Ignore",
-                      callback_data: projectEventCandidateCallbackData(
-                        "ignore",
-                        candidate.id,
-                      ),
-                    },
+          if (
+            candidate.eventType === "possible_task_completion" &&
+            candidate.matchedTaskId &&
+            candidate.confidence >= AUTO_COMPLETION_CONFIDENCE &&
+            effectiveContext.userRecordId
+          ) {
+            await reviewProjectEventCandidate(
+              supabase,
+              effectiveContext,
+              candidate.id,
+              "confirm",
+            );
+            const reaction = gateway.reactToMessage
+              ? await gateway.reactToMessage(
+                  update.chat.id,
+                  update.messageId,
+                  "✅",
+                )
+              : { sent: false };
+            if (reaction.sent) {
+              replySent = true;
+            } else {
+              const fallback = await gateway.sendMessage(
+                update.chat.id,
+                "✅ Task marked complete and attributed to the member who completed it.",
+                { replyToMessageId: update.messageId },
+              );
+              replySent = fallback.sent || replySent;
+            }
+          } else {
+            const delivery = await gateway.sendMessage(
+              update.chat.id,
+              projectEventCandidateMessage(candidate),
+              {
+                replyToMessageId: update.messageId,
+                replyMarkup: {
+                  inline_keyboard: [
+                    [
+                      {
+                        text: `✅ ${projectEventConfirmLabel(candidate.eventType)}`,
+                        callback_data: projectEventCandidateCallbackData(
+                          "confirm",
+                          candidate.id,
+                        ),
+                      },
+                      {
+                        text: "✏️ Edit",
+                        callback_data: projectEventCandidateCallbackData(
+                          "edit",
+                          candidate.id,
+                        ),
+                      },
+                      {
+                        text: "❌ Ignore",
+                        callback_data: projectEventCandidateCallbackData(
+                          "ignore",
+                          candidate.id,
+                        ),
+                      },
+                    ],
                   ],
-                ],
+                },
               },
-            },
-          );
-          replySent = delivery.sent || replySent;
+            );
+            replySent = delivery.sent || replySent;
+          }
         }
       }
     } else {
+      const interactiveResult = await handleInteractiveTelegramCallback(
+        supabase,
+        update,
+        context,
+        gateway,
+      );
       const taskView = parseTaskViewCallbackData(update.data);
       const bulkAssignment = parseBulkAssignmentCallbackData(update.data);
       const taskBatch = parseCandidateBatchCallbackData(update.data);
@@ -395,7 +497,7 @@ export async function processTelegramUpdate(
       const isProjectEvent = Boolean(
         parseProjectEventCandidateCallbackData(update.data),
       );
-      const result = taskView
+      const result = interactiveResult ?? (taskView
         ? await handleTaskViewCallback(update, context, {
             answerCallback: gateway.answerCallback,
             sendMessage: gateway.sendMessage,
@@ -460,7 +562,7 @@ export async function processTelegramUpdate(
               sendMessage: gateway.sendMessage,
               reviewCandidate: (candidateId, action) =>
                 reviewTaskCandidate(supabase, context, candidateId, action),
-            });
+            }));
       replySent = result.replySent;
     }
 
@@ -472,6 +574,336 @@ export async function processTelegramUpdate(
     await failTelegramUpdate(supabase, update.updateId, message);
     throw error;
   }
+}
+
+async function handleInteractiveTelegramCallback(
+  supabase: SupabaseClient,
+  update: TelegramInboundCallback,
+  context: TelegramContext,
+  gateway: TelegramGateway,
+) {
+  if (!update.chat) return null;
+
+  const projectEvent = parseProjectEventCandidateCallbackData(update.data);
+  if (projectEvent?.action === "edit" && context.projectId) {
+    await gateway.answerCallback(update.callbackQueryId, "Choose what to edit");
+    const delivery = await gateway.sendMessage(
+      update.chat.id,
+      "✏️ What should change before this project event is confirmed?",
+      {
+        replyMarkup: {
+          inline_keyboard: [
+            [
+              {
+                text: "📝 Title",
+                callback_data: candidateEditCallbackData(
+                  "title",
+                  projectEvent.candidateId,
+                ),
+              },
+              {
+                text: "👤 Owner",
+                callback_data: candidateEditCallbackData(
+                  "owner",
+                  projectEvent.candidateId,
+                ),
+              },
+            ],
+            [
+              {
+                text: "📅 Deadline",
+                callback_data: candidateEditCallbackData(
+                  "deadline",
+                  projectEvent.candidateId,
+                ),
+              },
+            ],
+          ],
+        },
+      },
+    );
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const candidateEdit = parseCandidateEditCallbackData(update.data);
+  if (candidateEdit && context.projectId) {
+    if (candidateEdit.field === "deadline") {
+      await gateway.answerCallback(update.callbackQueryId, "Choose a deadline");
+      const delivery = await gateway.sendMessage(
+        update.chat.id,
+        "📅 Set the candidate deadline:",
+        { replyMarkup: candidateDeadlineMenu(candidateEdit.candidateId) },
+      );
+      return { handled: true, replySent: delivery.sent };
+    }
+    const session = await startTelegramEditSession(supabase, context, {
+      targetKind: "project_event_candidate",
+      targetId: candidateEdit.candidateId,
+      fieldName: candidateEdit.field,
+    });
+    await gateway.answerCallback(update.callbackQueryId, "Editing started");
+    const delivery =
+      candidateEdit.field === "title"
+        ? await gateway.sendMessage(
+            update.chat.id,
+            "📝 Send the corrected title now. Send /cancel to stop editing.",
+          )
+        : await gateway.sendMessage(
+            update.chat.id,
+            session.options.length
+              ? "👤 Choose the correct owner:"
+              : "No linked project members are available yet. Ask members to say hello in this group.",
+            {
+              replyMarkup: ownerChoiceMenu(session.id, session.options),
+            },
+          );
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const candidateDeadline = parseCandidateDeadlineCallbackData(update.data);
+  if (candidateDeadline && context.projectId) {
+    const deadline = deadlineFromPreset(candidateDeadline.preset);
+    const updated = await updateCandidateDeadlineFromTelegram(
+      supabase,
+      context,
+      candidateDeadline.candidateId,
+      deadline,
+    );
+    await gateway.answerCallback(update.callbackQueryId, "Deadline updated");
+    const delivery = await gateway.sendMessage(
+      update.chat.id,
+      `✅ Candidate updated\n\n${updated.summary}\nDeadline: ${updated.dueLabel ?? "None"}`,
+    );
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const ownerChoice = parseEditSessionChoiceCallbackData(update.data);
+  if (ownerChoice) {
+    const changed = await applyTelegramOwnerChoice(
+      supabase,
+      context,
+      ownerChoice.sessionId,
+      ownerChoice.optionIndex,
+    );
+    await gateway.answerCallback(update.callbackQueryId, "Owner updated");
+    if (update.messageId) {
+      await gateway.clearKeyboard(update.chat.id, update.messageId);
+    }
+    const delivery = await gateway.sendMessage(
+      update.chat.id,
+      `✅ Owner changed to ${changed.owner.displayName}.`,
+    );
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const taskDeadline = parseTaskDeadlineCallbackData(update.data);
+  if (taskDeadline) {
+    const task = await getTaskForTelegramContext(
+      supabase,
+      context,
+      taskDeadline.taskId,
+    );
+    if (!task) {
+      await gateway.answerCallback(update.callbackQueryId, "Task unavailable");
+      return { handled: true, replySent: false };
+    }
+    const changed = await updateTaskDeadlineFromTelegram(
+      supabase,
+      { ...context, projectId: task.project_id },
+      task,
+      deadlineFromPreset(taskDeadline.preset),
+    );
+    await gateway.answerCallback(update.callbackQueryId, "Deadline updated");
+    const response = taskDetailResponse(changed ?? task, {
+      privateChat: update.chat.type === "private",
+    });
+    const delivery = await gateway.sendMessage(update.chat.id, response.text, {
+      replyMarkup: response.replyMarkup,
+    });
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const taskSnooze = parseTaskSnoozeCallbackData(update.data);
+  if (taskSnooze) {
+    const task = await getTaskForTelegramContext(
+      supabase,
+      context,
+      taskSnooze.taskId,
+    );
+    if (!task) {
+      await gateway.answerCallback(update.callbackQueryId, "Task unavailable");
+      return { handled: true, replySent: false };
+    }
+    const scheduledFor = snoozeFromPreset(taskSnooze.preset);
+    await snoozeTaskReminder(supabase, task, scheduledFor);
+    await gateway.answerCallback(update.callbackQueryId, "Reminder snoozed");
+    const delivery = await gateway.sendMessage(
+      update.chat.id,
+      `⏰ I'll remind you about “${task.title}” ${formatReminderTime(scheduledFor)}.`,
+    );
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const taskAction = parseTaskActionCallbackData(update.data);
+  if (taskAction) {
+    const task = await getTaskForTelegramContext(
+      supabase,
+      context,
+      taskAction.taskId,
+    );
+    if (!task) {
+      await gateway.answerCallback(update.callbackQueryId, "Task unavailable");
+      return { handled: true, replySent: false };
+    }
+    const taskContext = { ...context, projectId: task.project_id };
+    if (taskAction.action === "complete" || taskAction.action === "reopen") {
+      const changed = await updateTaskStatusFromTelegram(
+        supabase,
+        taskContext,
+        task,
+        taskAction.action === "complete" ? "done" : "todo",
+      );
+      await gateway.answerCallback(
+        update.callbackQueryId,
+        taskAction.action === "complete" ? "Task completed" : "Task reopened",
+      );
+      const response = taskDetailResponse(changed, {
+        privateChat: update.chat.type === "private",
+      });
+      const delivery = await gateway.sendMessage(update.chat.id, response.text, {
+        replyMarkup: response.replyMarkup,
+      });
+      return { handled: true, replySent: delivery.sent };
+    }
+    if (taskAction.action === "edit_deadline") {
+      await gateway.answerCallback(update.callbackQueryId, "Choose a deadline");
+      const delivery = await gateway.sendMessage(
+        update.chat.id,
+        `📅 Deadline for “${task.title}”:`,
+        { replyMarkup: taskDeadlineMenu(task.id) },
+      );
+      return { handled: true, replySent: delivery.sent };
+    }
+    if (taskAction.action === "snooze") {
+      await gateway.answerCallback(update.callbackQueryId, "Choose when");
+      const delivery = await gateway.sendMessage(
+        update.chat.id,
+        `⏰ Snooze “${task.title}” until:`,
+        { replyMarkup: taskSnoozeMenu(task.id) },
+      );
+      return { handled: true, replySent: delivery.sent };
+    }
+    if (taskAction.action === "edit_title" || taskAction.action === "edit_owner") {
+      const fieldName = taskAction.action === "edit_title" ? "title" : "owner";
+      const session = await startTelegramEditSession(supabase, taskContext, {
+        targetKind: "task",
+        targetId: task.id,
+        fieldName,
+      });
+      await gateway.answerCallback(update.callbackQueryId, "Editing started");
+      const delivery =
+        fieldName === "title"
+          ? await gateway.sendMessage(
+              update.chat.id,
+              "📝 Send the corrected task title now. Send /cancel to stop editing.",
+            )
+          : await gateway.sendMessage(
+              update.chat.id,
+              session.options.length
+                ? "👤 Choose the new owner:"
+                : "No linked project members are available yet.",
+              { replyMarkup: ownerChoiceMenu(session.id, session.options) },
+            );
+      return { handled: true, replySent: delivery.sent };
+    }
+    await gateway.answerCallback(update.callbackQueryId, "Task details");
+    const response = taskDetailResponse(task, {
+      privateChat: update.chat.type === "private",
+    });
+    const delivery = await gateway.sendMessage(update.chat.id, response.text, {
+      replyMarkup: response.replyMarkup,
+    });
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  const home = parseProjectHomeCallbackData(update.data);
+  if (home && context.projectId) {
+    const [project, tasks] = await Promise.all([
+      getTelegramProject(supabase, context.projectId),
+      listProjectTasks(supabase, context.projectId),
+    ]);
+    const response =
+      home.action === "tasks"
+        ? tasksResponse(project, tasks)
+        : home.action === "due_today"
+          ? dueTodayResponse(project, tasks)
+          : home.action === "settings"
+            ? settingsResponse(project)
+            : projectHomeResponse(project, tasks);
+    await gateway.answerCallback(update.callbackQueryId, "TaskGoblin");
+    const delivery = await gateway.sendMessage(update.chat.id, response.text, {
+      replyMarkup: response.replyMarkup,
+    });
+    return { handled: true, replySent: delivery.sent };
+  }
+
+  return null;
+}
+
+function ownerChoiceMenu(
+  sessionId: string,
+  options: Array<{ displayName: string }>,
+) {
+  if (!options.length) return undefined;
+  return {
+    inline_keyboard: options.map((option, index) => [
+      {
+        text: `👤 ${option.displayName}`,
+        callback_data: editSessionChoiceCallbackData(sessionId, index),
+      },
+    ]),
+  };
+}
+
+function taskDeadlineMenu(taskId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Today", callback_data: taskDeadlineCallbackData("today", taskId) },
+        { text: "Tomorrow", callback_data: taskDeadlineCallbackData("tomorrow", taskId) },
+      ],
+      [
+        { text: "Next week", callback_data: taskDeadlineCallbackData("next_week", taskId) },
+        { text: "Clear", callback_data: taskDeadlineCallbackData("clear", taskId) },
+      ],
+    ],
+  };
+}
+
+function candidateDeadlineMenu(candidateId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Today", callback_data: candidateDeadlineCallbackData("today", candidateId) },
+        { text: "Tomorrow", callback_data: candidateDeadlineCallbackData("tomorrow", candidateId) },
+      ],
+      [
+        { text: "Next week", callback_data: candidateDeadlineCallbackData("next_week", candidateId) },
+        { text: "Clear", callback_data: candidateDeadlineCallbackData("clear", candidateId) },
+      ],
+    ],
+  };
+}
+
+function taskSnoozeMenu(taskId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "1 hour", callback_data: taskSnoozeCallbackData("one_hour", taskId) },
+        { text: "Tomorrow 9 AM", callback_data: taskSnoozeCallbackData("tomorrow_morning", taskId) },
+      ],
+    ],
+  };
 }
 
 export type BulkAssignmentCallbackDependencies = {
@@ -799,19 +1231,17 @@ async function routeTelegramCommand(
   context: TelegramContext,
   isPrivateChat: boolean,
 ): Promise<TelegramCommandResponse> {
-  if (command === "start") {
+  if (command === "start" && isPrivateChat) {
     return {
-      text: isPrivateChat
-        ? [
+      text: [
             "👋 Welcome to your TaskGoblin workspace.",
             "",
             "Use /mytasks to browse your assigned tasks across every project.",
             "Open a project group to use /summary, /project, /kpi, and /tasks.",
-          ].join("\n")
-        : helpMessage(),
+          ].join("\n"),
     };
   }
-  if (command === "help") return { text: helpMessage() };
+  if (command === "help" && isPrivateChat) return { text: helpMessage() };
   if (command === "mytasks" && isPrivateChat) {
     if (!context.userRecordId) {
       return { text: "I could not identify your Telegram account." };
@@ -825,10 +1255,23 @@ async function routeTelegramCommand(
     };
   }
 
+  if (command === "undo") {
+    const undone = await undoLastTaskMutation(supabase, context);
+    return {
+      text: undone
+        ? `↩️ ${undone.description}`
+        : "There is no task change to undo in this project.",
+    };
+  }
+
   const [project, tasks] = await Promise.all([
     getTelegramProject(supabase, context.projectId),
     listProjectTasks(supabase, context.projectId),
   ]);
+  if (command === "start") return projectHomeResponse(project, tasks);
+  if (command === "help") {
+    return { text: helpMessage(), replyMarkup: projectHomeMenu(project) };
+  }
   if (command === "summary") {
     const knowledge = await loadProjectSummaryKnowledge(
       supabase,
@@ -864,21 +1307,22 @@ function projectEventCandidateMessage(
     : candidate.duplicateOfCandidateId
       ? "Possible duplicate of a recent candidate."
       : null;
-  const lines = [
-    `Possible ${projectEventLabel(candidate.eventType)} detected:`,
-    "",
-    candidate.summary,
-  ];
+  const label = projectEventLabel(candidate.eventType);
+  const lines = ["🤖 I detected a project event.", "", `📌 ${candidate.summary}`];
   if (candidate.dueLabel) {
-    lines.push("", `Deadline: ${candidate.dueLabel}`);
-    lines.push("A private reminder will be queued one hour before.");
+    lines.push(`📅 ${candidate.dueLabel}`);
   }
   if (duplicate) lines.push("", duplicate);
   lines.push(
     "",
-    "Review this before TaskGoblin changes project state.",
+    `Why: I interpreted the message as ${articleFor(label)} ${label}.`,
+    "Is this correct?",
   );
   return lines.join("\n");
+}
+
+function articleFor(value: string) {
+  return /^[aeiou]/i.test(value) ? "an" : "a";
 }
 
 function projectEventLabel(

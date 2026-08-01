@@ -51,12 +51,15 @@ model call. It retrieves project context, selects an action, matches mentions
 against known members, checks existing tasks and duplicates, and may use tools
 to propose several tasks or answer a project question. Model text cannot
 directly mutate the database. Consequential inferences are persisted as
-candidates and shown through Telegram confirmation controls before they change
-project state. The website provides a secondary Kanban, calendar and correction
-surface; Telegram remains the primary workflow.
+candidates and normally shown through Telegram confirmation controls before
+they change project state. A confidently matched explicit completion uses a
+controlled exception: TaskGoblin reacts to the source message, records the
+completing member as owner, and keeps the change reversible through `/undo`.
+The website provides a secondary Kanban, calendar and correction surface;
+Telegram remains the primary workflow.
 
 The current bot command surface is deliberately small: `/start`, `/help`,
-`/summary`, `/project`, `/kpi`, `/tasks` and `/mytasks`. Task selection and
+`/summary`, `/project`, `/kpi`, `/tasks`, `/mytasks` and `/undo`. Task selection and
 candidate review continue through inline Telegram buttons. Commands such as
 `/recent`, `/addtask`, `/done`, `/update`, `/setproject` and `/addmilestone`
 are roadmap ideas, not features of the submitted prototype.
@@ -197,8 +200,8 @@ these measurements identify a real failure.
 - Greets and provisions a project group when the bot is added.
 - Links members when they say `hello`; private chat `/start` enables direct
   reminders.
-- Supports `/start`, `/help`, `/summary`, `/project`, `/kpi`, `/tasks` and
-  `/mytasks`.
+- Supports `/start`, `/help`, `/summary`, `/project`, `/kpi`, `/tasks`,
+  `/mytasks` and `/undo`.
 - Detects task proposals, explicit assignments, progress, possible
   completions, deadline changes, blockers and decisions from permitted group
   messages.
@@ -211,6 +214,11 @@ these measurements identify a real failure.
   project context.
 - Sends scheduled private Telegram reminders and grounds reminder follow-up
   advice in the relevant task, project and stored documents.
+- Sends a deduplicated project report to active groups at 8pm Singapore time,
+  covering progress, urgent work, owners, blockers and the next seven days.
+- Reacts to confidently matched explicit completion messages, marks the task
+  complete and attributes ownership to the member who completed the work.
+- Keeps task mutation history so `/undo` can restore the previous task state.
 - Links command and agent responses back to the relevant project dashboard.
 
 ### Website

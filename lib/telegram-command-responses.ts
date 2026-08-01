@@ -1,4 +1,7 @@
-import { taskViewCallbackData } from "@/lib/telegram-callbacks";
+import {
+  projectHomeCallbackData,
+  taskActionCallbackData,
+} from "@/lib/telegram-callbacks";
 import type { TelegramInlineKeyboard } from "@/lib/telegram-bot";
 import { telegramProjectDashboardUrl } from "@/lib/telegram-links";
 import type {
@@ -12,6 +15,64 @@ export type TelegramCommandResponse = {
   text: string;
   replyMarkup?: TelegramInlineKeyboard;
 };
+
+export function projectHomeResponse(
+  project: TelegramProjectRow,
+  tasks: TelegramTaskRow[],
+): TelegramCommandResponse {
+  const active = tasks.filter((task) => task.status !== "done");
+  const dueToday = active.filter((task) => isDueToday(task));
+  const blocked = active.filter((task) => task.status === "blocked");
+  return {
+    text: [
+      `🏠 ${project.name}`,
+      "",
+      `${active.length} open · ${dueToday.length} due today · ${blocked.length} blocked`,
+      "",
+      active.length
+        ? "Choose what you want to see."
+        : "🎉 You're all caught up. No outstanding tasks.",
+    ].join("\n"),
+    replyMarkup: projectHomeMenu(project),
+  };
+}
+
+export function dueTodayResponse(
+  project: TelegramProjectRow,
+  tasks: TelegramTaskRow[],
+  now = new Date(),
+): TelegramCommandResponse {
+  const due = tasks
+    .filter((task) => task.status !== "done" && isDueToday(task, now))
+    .sort(comparePriorityThenDue);
+  return {
+    text: due.length
+      ? [
+          `⏰ Due today · ${project.name}`,
+          "",
+          ...due.map((task) => formattedTaskLine(task)),
+          "",
+          "Select a task to act on it.",
+        ].join("\n")
+      : `🎉 Nothing is due today in ${project.name}.`,
+    replyMarkup: projectMenu(project, taskMenu(due)),
+  };
+}
+
+export function settingsResponse(
+  project: TelegramProjectRow,
+): TelegramCommandResponse {
+  return {
+    text: [
+      `⚙️ ${project.name} settings`,
+      "",
+      "TaskGoblin asks before consequential inferred changes.",
+      "Use /undo to reverse the latest confirmed task change.",
+      "Members can open the dashboard for Kanban, calendar, and detailed editing.",
+    ].join("\n"),
+    replyMarkup: projectHomeMenu(project),
+  };
+}
 
 export function summaryResponse(
   project: TelegramProjectRow,
@@ -274,8 +335,45 @@ export function privateMyTasksResponse(
   };
 }
 
-export function taskDetailMessage(task: TelegramUserTaskRow) {
-  return [
+export function taskDetailResponse(
+  task: TelegramUserTaskRow,
+  options: { privateChat?: boolean } = {},
+): TelegramCommandResponse {
+  const action = task.status === "done" ? "reopen" : "complete";
+  const rows: TelegramInlineKeyboard["inline_keyboard"] = [
+    [
+      {
+        text: task.status === "done" ? "↩️ Reopen" : "✅ Complete",
+        callback_data: taskActionCallbackData(action, task.id),
+      },
+      {
+        text: "✏️ Title",
+        callback_data: taskActionCallbackData("edit_title", task.id),
+      },
+    ],
+    [
+      {
+        text: "👤 Owner",
+        callback_data: taskActionCallbackData("edit_owner", task.id),
+      },
+      {
+        text: "📅 Deadline",
+        callback_data: taskActionCallbackData("edit_deadline", task.id),
+      },
+    ],
+  ];
+  if (options.privateChat && task.status !== "done") {
+    rows.push([
+      {
+        text: "⏰ Snooze reminder",
+        callback_data: taskActionCallbackData("snooze", task.id),
+      },
+    ]);
+  }
+  const dashboardUrl = telegramProjectDashboardUrl(task.project_id);
+  if (dashboardUrl) rows.push([{ text: "🌐 Open project", url: dashboardUrl }]);
+  return {
+    text: [
     `📝 ${task.title}`,
     "",
     `Project: ${task.project_name}`,
@@ -285,7 +383,13 @@ export function taskDetailMessage(task: TelegramUserTaskRow) {
     `Deadline: ${task.due_label ?? task.due_at ?? "None"}`,
     ...(task.description ? [`Description: ${task.description}`] : []),
     ...(task.blocked_by ? [`Blocker: ${task.blocked_by}`] : []),
-  ].join("\n");
+    ].join("\n"),
+    replyMarkup: { inline_keyboard: rows },
+  };
+}
+
+export function taskDetailMessage(task: TelegramUserTaskRow) {
+  return taskDetailResponse(task).text;
 }
 
 function taskMenu(
@@ -305,7 +409,7 @@ function taskMenu(
               `${statusEmoji(task.status)} ${project}${task.title}`,
               52,
             ),
-            callback_data: taskViewCallbackData(task.id),
+            callback_data: taskActionCallbackData("view", task.id),
           },
         ],
       ];
@@ -327,14 +431,51 @@ function projectWebsiteLines(projectId: string) {
     : [];
 }
 
+export function projectHomeMenu(
+  project: Pick<TelegramProjectRow, "id" | "name">,
+): TelegramInlineKeyboard {
+  const rows: TelegramInlineKeyboard["inline_keyboard"] = [
+    [
+      { text: "📋 Open tasks", callback_data: projectHomeCallbackData("tasks") },
+      { text: "⏰ Due today", callback_data: projectHomeCallbackData("due_today") },
+    ],
+  ];
+  const url = telegramProjectDashboardUrl(project.id);
+  if (url) {
+    rows.push([
+      { text: "📅 Calendar", url: `${url}?view=calendar` },
+      { text: "⚙️ Settings", callback_data: projectHomeCallbackData("settings") },
+    ]);
+    rows.push([{ text: `🌐 Open ${truncate(project.name, 32)}`, url }]);
+  } else {
+    rows.push([
+      { text: "⚙️ Settings", callback_data: projectHomeCallbackData("settings") },
+    ]);
+  }
+  return { inline_keyboard: rows };
+}
+
 function projectMenu(
   project: Pick<TelegramProjectRow, "id" | "name">,
   existing?: TelegramInlineKeyboard,
 ) {
   return mergeMenus(
     existing,
-    projectLinksMenu([{ id: project.id, name: project.name }]),
+    projectHomeMenu(project),
   );
+}
+
+function isDueToday(task: TelegramTaskRow, now = new Date()) {
+  if (!task.due_at) return false;
+  const due = new Date(task.due_at);
+  if (Number.isNaN(due.getTime())) return false;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Singapore",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(due) === formatter.format(now);
 }
 
 function projectLinksMenu(
